@@ -14,7 +14,10 @@ import {
   FaTrophy,
   FaSignOutAlt,
   FaTachometerAlt,
-  FaRobot
+  FaRobot,
+  FaStore,
+  FaCalendarAlt,
+  FaDiscord
 } from 'react-icons/fa';
 import Orb from '../ui/Orb';
 
