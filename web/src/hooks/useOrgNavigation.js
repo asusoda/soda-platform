@@ -36,8 +36,8 @@ const useOrgNavigation = () => {
   const goToGamePanel = () => navigateToOrg("gamepanel");
   const goToActiveGame = () => navigateToOrg("activegame");
   const goToMerchProducts = () => navigateToOrg("merch/products");
-  const goToAddProducts = () => navigateToOrg("merch/products/add");
-  const goToOrders = () => navigateToOrg("/transactions");
+  const goToAddProducts = () => navigateToOrg("add-merchandise");
+  const goToOrders = () => navigateToOrg("transactions");
 
   return {
     navigateToOrg,

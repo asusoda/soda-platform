@@ -78,8 +78,13 @@ const LeaderboardPage = () => {
   const fetchLeaderboard = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/api/public/leaderboard');
-      setLeaderboardData(response.data);
+      if (!currentOrg?.prefix) {
+        setError('No organization selected');
+        return;
+      }
+      
+      const response = await apiClient.get(`/api/public/${currentOrg.prefix}/leaderboard`);
+      setLeaderboardData(response.data.leaderboard || []);
     } catch (error) {
       setError('Failed to fetch leaderboard data');
       console.error('Error fetching leaderboard:', error);
@@ -90,7 +95,7 @@ const LeaderboardPage = () => {
 
   useEffect(() => {
     fetchLeaderboard();
-  }, []);
+  }, [currentOrg]);
 
   return (
     <OrganizationNavbar>

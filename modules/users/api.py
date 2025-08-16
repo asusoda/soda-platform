@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request
 from modules.auth.decoraters import auth_required, error_handler
 from modules.points.models import User, Points
 from shared import config, db_connect
+from sqlalchemy import func
 
 # Flask Blueprint for users
 users_blueprint = Blueprint("users", __name__, template_folder=None, static_folder=None)
@@ -19,42 +20,87 @@ def users_index():
 @auth_required
 @error_handler
 def view_user():
-    # Get the user identifier from the query parameters (can be email or UUID)
+    # Get the user identifier and optional organization_id from query parameters
     user_identifier = request.args.get('user_identifier')
+    organization_id = request.args.get('organization_id')
 
     if not user_identifier:
-        return jsonify({"error": "User identifier (email or UUID) is required."}), 400
+        return jsonify({"error": "User identifier (email, UUID, or username) is required."}), 400
 
     db = next(db_connect.get_db())
     
     try:
-        # Query the user by either email or UUID
-        user = db.query(User).filter((User.email == user_identifier) | (User.uuid == user_identifier)).first()
+        # Query the user by email, UUID, or username
+        user = db.query(User).filter(
+            (User.email == user_identifier) | 
+            (User.uuid == user_identifier) | 
+            (User.username == user_identifier)
+        ).first()
 
         if not user:
             return jsonify({"error": "User not found."}), 404
 
-        # Query the points earned by the user
-        points_records = db.query(Points).filter_by(user_email=user.email).all()
+        # Get user's organization memberships
+        from modules.points.models import UserOrganizationMembership
+        memberships = db.query(UserOrganizationMembership).filter_by(
+            user_id=user.id,
+            is_active=True
+        ).all()
 
-        # Prepare the points data
-        points_data = [
-            {
-                "points": record.points,
-                "event": record.event,
-                "timestamp": record.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                "awarded_by_officer": record.awarded_by_officer
-            }
-            for record in points_records
-        ]
+        # Get organizations and points data
+        organizations_data = []
+        total_points_all_orgs = 0
+        
+        for membership in memberships:
+            from modules.organizations.models import Organization
+            org = db.query(Organization).filter_by(id=membership.organization_id).first()
+            if org:
+                # Get points for this organization
+                org_points = db.query(func.sum(Points.points)).filter_by(
+                    user_id=user.id,
+                    organization_id=org.id
+                ).scalar() or 0
+                
+                # Get points records for this organization
+                points_records = db.query(Points).filter_by(
+                    user_id=user.id,
+                    organization_id=org.id
+                ).order_by(Points.last_updated.desc()).all()
+                
+                points_data = [{
+                    "id": record.id,
+                    "points": record.points,
+                    "last_updated": record.last_updated.isoformat() if record.last_updated else None
+                } for record in points_records]
+                
+                organizations_data.append({
+                    "organization": {
+                        "id": org.id,
+                        "name": org.name,
+                        "prefix": org.prefix,
+                        "description": org.description
+                    },
+                    "points": org_points,
+                    "points_history": points_data,
+                    "joined_at": membership.joined_at.isoformat() if membership.joined_at else None
+                })
+                
+                total_points_all_orgs += org_points
 
-        # Prepare the user data along with the points
+        # Prepare the user data
         user_data = {
+            "id": user.id,
             "name": user.name,
+            "username": user.username,
+            "email": user.email,
             "uuid": user.uuid,
+            "asu_id": user.asu_id,
             "academic_standing": user.academic_standing,
             "major": user.major,
-            "points_earned": points_data
+            "discord_linked": bool(user.discord_id),
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "total_points_all_orgs": total_points_all_orgs,
+            "organizations": organizations_data
         }
 
         return jsonify(user_data), 200
@@ -179,3 +225,216 @@ def handle_form_submission():
         return jsonify({'error': str(e)}), 500
     
     return jsonify({"message": "recieved id: " + discordID + " and role: " + role}), 200
+
+# Organization-prefix based endpoints
+@users_blueprint.route("/<string:org_prefix>/users", methods=["GET"])
+@auth_required
+@error_handler
+def get_organization_users(org_prefix):
+    """Get all users for a specific organization"""
+    db = next(db_connect.get_db())
+    try:
+        from modules.organizations.models import Organization
+        from modules.points.models import UserOrganizationMembership
+        
+        # Get organization by prefix
+        organization = db.query(Organization).filter_by(
+            prefix=org_prefix,
+            is_active=True
+        ).first()
+        
+        if not organization:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        # Get all users who are members of this organization
+        memberships = db.query(UserOrganizationMembership).filter_by(
+            organization_id=organization.id,
+            is_active=True
+        ).all()
+        
+        users_data = []
+        for membership in memberships:
+            user = db.query(User).filter_by(id=membership.user_id).first()
+            if user:
+                # Get user's points in this organization
+                user_points = db.query(func.sum(Points.points)).filter_by(
+                    user_id=user.id,
+                    organization_id=organization.id
+                ).scalar() or 0
+                
+                users_data.append({
+                    "id": user.id,
+                    "name": user.name,
+                    "username": user.username,
+                    "email": user.email,
+                    "asu_id": user.asu_id,
+                    "academic_standing": user.academic_standing,
+                    "major": user.major,
+                    "discord_linked": bool(user.discord_id),
+                    "points": user_points,
+                    "joined_at": membership.joined_at.isoformat() if membership.joined_at else None
+                })
+        
+        return jsonify({
+            "organization": {
+                "name": organization.name,
+                "prefix": organization.prefix,
+                "description": organization.description
+            },
+            "total_members": len(users_data),
+            "users": users_data
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+@users_blueprint.route("/<string:org_prefix>/users/<string:user_identifier>", methods=["GET"])
+@auth_required
+@error_handler
+def get_user_in_organization(org_prefix, user_identifier):
+    """Get a specific user's details within an organization"""
+    db = next(db_connect.get_db())
+    try:
+        from modules.organizations.models import Organization
+        from modules.points.models import UserOrganizationMembership
+        
+        # Get organization by prefix
+        organization = db.query(Organization).filter_by(
+            prefix=org_prefix,
+            is_active=True
+        ).first()
+        
+        if not organization:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        # Find user by email, UUID, or username
+        user = db.query(User).filter(
+            (User.email == user_identifier) | 
+            (User.uuid == user_identifier) | 
+            (User.username == user_identifier)
+        ).first()
+        
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Check if user is a member of this organization
+        membership = db.query(UserOrganizationMembership).filter_by(
+            user_id=user.id,
+            organization_id=organization.id,
+            is_active=True
+        ).first()
+        
+        if not membership:
+            return jsonify({"error": "User is not a member of this organization"}), 404
+        
+        # Get user's points in this organization
+        user_points = db.query(func.sum(Points.points)).filter_by(
+            user_id=user.id,
+            organization_id=organization.id
+        ).scalar() or 0
+        
+        # Get points history for this organization
+        points_records = db.query(Points).filter_by(
+            user_id=user.id,
+            organization_id=organization.id
+        ).order_by(Points.last_updated.desc()).all()
+        
+        points_history = [{
+            "id": record.id,
+            "points": record.points,
+            "last_updated": record.last_updated.isoformat() if record.last_updated else None
+        } for record in points_records]
+        
+        return jsonify({
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "username": user.username,
+                "email": user.email,
+                "asu_id": user.asu_id,
+                "academic_standing": user.academic_standing,
+                "major": user.major,
+                "discord_linked": bool(user.discord_id),
+                "created_at": user.created_at.isoformat() if user.created_at else None
+            },
+            "organization": {
+                "name": organization.name,
+                "prefix": organization.prefix,
+                "description": organization.description
+            },
+            "membership": {
+                "points": user_points,
+                "joined_at": membership.joined_at.isoformat() if membership.joined_at else None,
+                "points_history": points_history
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+@users_blueprint.route("/<string:org_prefix>/users", methods=["POST"])
+@auth_required
+@error_handler
+def add_user_to_organization(org_prefix):
+    """Add a user to a specific organization"""
+    data = request.json
+    db = next(db_connect.get_db())
+    try:
+        from modules.organizations.models import Organization
+        from modules.points.api import link_or_create_user
+        
+        # Get organization by prefix
+        organization = db.query(Organization).filter_by(
+            prefix=org_prefix,
+            is_active=True
+        ).first()
+        
+        if not organization:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        # Validate required fields
+        if not data.get('name') and not data.get('username'):
+            return jsonify({"error": "Either name or username is required"}), 400
+        
+        # Use the link_or_create_user function from points API
+        user_data = {
+            'username': data.get('username'),
+            'email': data.get('email'),
+            'name': data.get('name'),
+            'asu_id': data.get('asu_id', 'N/A'),
+            'academic_standing': data.get('academic_standing', 'N/A'),
+            'major': data.get('major', 'N/A')
+        }
+        
+        user = link_or_create_user(
+            organization.id,
+            user_data,
+            data.get('discord_id')
+        )
+        
+        if not user:
+            return jsonify({"error": "Failed to create or link user"}), 500
+        
+        return jsonify({
+            "message": "User added to organization successfully",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "username": user.username,
+                "email": user.email,
+                "discord_linked": bool(user.discord_id)
+            },
+            "organization": {
+                "name": organization.name,
+                "prefix": organization.prefix
+            }
+        }), 201
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()

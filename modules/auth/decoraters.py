@@ -226,6 +226,101 @@ def superadmin_required(f):
     return wrapper
 
 
+def member_required(f):
+    """
+    Decorator that requires the user to be a member of the organization specified by org_prefix.
+    Similar to auth_required but checks for guild membership instead of officer role.
+    """
+    
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        try:
+            print(f"🔍 [DEBUG] member_required decorator called for function: {f.__name__}")
+            
+            # Get the org_prefix from the URL parameters
+            org_prefix = kwargs.get('org_prefix') or (args[0] if args else None)
+            if not org_prefix:
+                print(f"❌ [DEBUG] No org_prefix found in request")
+                return jsonify({"message": "Organization prefix is required"}), 400
+            
+            print(f"🏢 [DEBUG] Organization prefix: {org_prefix}")
+            
+            # Get Discord ID from session (same as auth_required)
+            user_discord_id = session.get('discord_id')
+            if not user_discord_id:
+                print(f"❌ [DEBUG] No discord_id in session")
+                return jsonify({"message": "Discord authentication required"}), 401
+            
+            print(f"👤 [DEBUG] User discord_id from session: {user_discord_id}")
+            
+            # Get organization from database
+            try:
+                from shared import db_connect
+                from modules.organizations.models import Organization
+                
+                print(f"📊 [DEBUG] Getting database connection...")
+                db = next(db_connect.get_db())
+                
+                print(f"🏢 [DEBUG] Looking up organization with prefix: {org_prefix}")
+                organization = db.query(Organization).filter(
+                    Organization.prefix == org_prefix,
+                    Organization.is_active == True
+                ).first()
+                
+                if not organization:
+                    print(f"❌ [DEBUG] Organization not found for prefix: {org_prefix}")
+                    db.close()
+                    return jsonify({"message": "Organization not found"}), 404
+                
+                print(f"✅ [DEBUG] Found organization: {organization.name} (Guild ID: {organization.guild_id})")
+                db.close()
+                
+            except Exception as e:
+                print(f"❌ [DEBUG] Database error: {e}")
+                if 'db' in locals():
+                    db.close()
+                return jsonify({"message": f"Database error: {str(e)}"}), 500
+            
+            # Check if user is a member using the bot (same pattern as auth_required)
+            try:
+                from shared import auth_bot
+                
+                if not auth_bot:
+                    print(f"❌ [DEBUG] Discord bot not available")
+                    return jsonify({"message": "Discord bot not available"}), 503
+                
+                print(f"🤖 [DEBUG] Checking if user is member of guild: {organization.guild_id}")
+                
+                # Use bot's method to check membership
+                is_member = auth_bot.check_user_membership(int(user_discord_id), int(organization.guild_id))
+                if not is_member:
+                    print(f"❌ [DEBUG] User is not a member of guild: {organization.guild_id}")
+                    return jsonify({"message": "You must be a member of this organization to access this resource"}), 403
+                
+                print(f"✅ [DEBUG] User is a member of {organization.name}")
+                
+                # Add user info and organization to kwargs for the wrapped function
+                kwargs['user_discord_id'] = user_discord_id
+                kwargs['organization'] = organization
+                
+                print(f"✅ [DEBUG] Member authentication successful!")
+                return f(*args, **kwargs)
+                
+            except Exception as e:
+                print(f"❌ [DEBUG] Error checking guild membership: {e}")
+                import traceback
+                traceback.print_exc()
+                return jsonify({"message": f"Error verifying membership: {str(e)}"}), 500
+                
+        except Exception as e:
+            print(f"❌ [DEBUG] General error in member_required: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({"message": str(e)}), 500
+
+    return wrapper
+
+
 def error_handler(f):
     """
     Decorator to handle errors and return JSON error responses.

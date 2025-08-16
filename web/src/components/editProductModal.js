@@ -51,7 +51,7 @@ const EditProductModal = ({ product, onClose, onProductUpdated, organizationPref
       onClose(); // Close the modal
     } catch (err) {
       const errorMessage = "Failed to update product. " +
-        (err.response?.data?.error || err.message);
+        (err.response?.data?.error || err.response?.data?.message || err.message);
       setError(errorMessage);
       toast.error(errorMessage);
       console.error("Failed to update product:", err);

@@ -24,6 +24,9 @@ import LeaderBoard from "./pages/LeaderBoard";
 import MerchandiseListPage from "./pages/MerchandiseListPage";
 import AddMerchandisePage from "./pages/AddMerchandisePage";
 import TransactionsPage from "./pages/TransactionsPage";
+import MerchandiseDashboard from "./pages/MerchandiseDashboard";
+import MemberStorePage from "./pages/MemberStorePage";
+import MemberLoginPage from "./pages/MemberLoginPage";
 import MetricsPage from "./pages/MetricsPage";
 import { AuthProvider } from "./components/auth/AuthContext";
 import PrivateRoute from "./components/auth/PrivateRoute";
@@ -38,6 +41,20 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/auth" element={<TokenRetrival />} />
           <Route path="/500" element={<ServerError />} />
+          
+          {/* Member store (public browsing, auth required for ordering) */}
+          <Route path="/store/:orgPrefix" element={<MemberStorePage />} />
+          <Route path="/store/:orgPrefix/login" element={<MemberLoginPage />} />
+          
+          {/* Private merchandise management routes */}
+          <Route
+            path="/:orgPrefix/merch/dashboard"
+            element={
+              <PrivateRoute>
+                <MerchandiseDashboard />
+              </PrivateRoute>
+            }
+          />
           <Route
             path="/:orgPrefix/merch/products"
             element={
@@ -47,7 +64,7 @@ function App() {
             }
           />
           <Route
-            path="/:orgPrefix/merch/products/add"
+            path="/:orgPrefix/add-merchandise"
             element={
               <PrivateRoute>
                 <AddMerchandisePage />

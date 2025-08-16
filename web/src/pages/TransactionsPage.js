@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useParams } from "react-router-dom";
 import apiClient from "../components/utils/axios";
 import OrganizationNavbar from "../components/shared/OrganizationNavbar";
-import { FaReceipt, FaPlus, FaTimes, FaSpinner, FaTrash } from "react-icons/fa";
+import { FaReceipt, FaPlus, FaTimes, FaSpinner, FaTrash, FaEdit, FaEnvelope } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { useAuth } from "../components/auth/AuthContext";
 
 const TransactionsPage = () => {
+  const { orgPrefix } = useParams();
   const { currentOrg } = useAuth();
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -19,9 +21,15 @@ const TransactionsPage = () => {
   });
   const [addTransactionLoading, setAddTransactionLoading] = useState(false);
   const [addTransactionError, setAddTransactionError] = useState(null);
+  
+  // Message management state
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [messageText, setMessageText] = useState('');
+  const [messageLoading, setMessageLoading] = useState(false);
 
   const fetchTransactions = useCallback(async () => {
-    if (!currentOrg?.prefix) {
+    const prefixToUse = orgPrefix || currentOrg?.prefix;
+    if (!prefixToUse) {
       setError("No organization selected");
       setLoading(false);
       return;
@@ -30,11 +38,11 @@ const TransactionsPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get(`/api/merch/${currentOrg.prefix}/orders`);
+      const response = await apiClient.get(`/api/merch/${prefixToUse}/orders`);
       setTransactions(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       const errorMessage = `Failed to fetch transactions. ${
-        err.response?.data?.message || err.message
+        err.response?.data?.error || err.response?.data?.message || err.message
       }`;
       setError(errorMessage);
       toast.error(errorMessage);
@@ -42,7 +50,7 @@ const TransactionsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentOrg?.prefix]);
+  }, [orgPrefix, currentOrg?.prefix]);
 
   useEffect(() => {
     fetchTransactions();
@@ -85,7 +93,8 @@ const TransactionsPage = () => {
   const handleAddTransactionSubmit = async (e) => {
     e.preventDefault();
     
-    if (!currentOrg?.prefix) {
+    const prefixToUse = orgPrefix || currentOrg?.prefix;
+    if (!prefixToUse) {
       toast.error("No organization selected");
       return;
     }
@@ -112,7 +121,7 @@ const TransactionsPage = () => {
     };
 
     try {
-      await apiClient.post(`/api/merch/${currentOrg.prefix}/orders`, payload);
+      await apiClient.post(`/api/merch/${prefixToUse}/orders`, payload);
       toast.success("Transaction added successfully!");
       setShowAddForm(false);
       setNewOrderData({
@@ -123,7 +132,7 @@ const TransactionsPage = () => {
       fetchTransactions();
     } catch (err) {
       const errorMessage = `Failed to add transaction: ${
-        err.response?.data?.message || err.message
+        err.response?.data?.error || err.response?.data?.message || err.message
       }`;
       setAddTransactionError(errorMessage);
       toast.error(errorMessage);
@@ -131,6 +140,42 @@ const TransactionsPage = () => {
     } finally {
       setAddTransactionLoading(false);
     }
+  };
+
+  const handleEditMessage = (transaction) => {
+    setEditingMessage(transaction.id);
+    setMessageText(transaction.message || '');
+  };
+
+  const handleSaveMessage = async (transactionId) => {
+    const prefixToUse = orgPrefix || currentOrg?.prefix;
+    if (!prefixToUse) {
+      toast.error("No organization selected");
+      return;
+    }
+
+    setMessageLoading(true);
+    try {
+      await apiClient.put(`/api/merch/${prefixToUse}/orders/${transactionId}`, {
+        message: messageText
+      });
+      toast.success("Message updated successfully!");
+      setEditingMessage(null);
+      setMessageText('');
+      fetchTransactions();
+    } catch (err) {
+      const errorMessage = `Failed to update message: ${
+        err.response?.data?.error || err.response?.data?.message || err.message
+      }`;
+      toast.error(errorMessage);
+    } finally {
+      setMessageLoading(false);
+    }
+  };
+
+  const handleCancelMessage = () => {
+    setEditingMessage(null);
+    setMessageText('');
   };
 
   if (!currentOrg) {
@@ -149,7 +194,7 @@ const TransactionsPage = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">Transactions</h1>
           <p className="text-gray-400">
-            Manage all merchandise orders and transactions for {currentOrg.name}
+            Manage all merchandise orders and transactions for {(currentOrg || {name: 'the organization'}).name}
           </p>
         </div>
 
@@ -192,10 +237,12 @@ const TransactionsPage = () => {
                 <thead className="text-gray-300 border-b border-gray-700">
                   <tr>
                     <th className="p-3 text-left font-medium">Order ID</th>
-                    <th className="p-3 text-left font-medium">User ID</th>
+                    <th className="p-3 text-left font-medium">Customer</th>
                     <th className="p-3 text-left font-medium">Status</th>
+                    <th className="p-3 text-left font-medium">Message</th>
                     <th className="p-3 text-left font-medium">Date</th>
                     <th className="p-3 text-right font-medium">Total Cost</th>
+                    <th className="p-3 text-center font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -204,24 +251,88 @@ const TransactionsPage = () => {
                       key={transaction.id}
                       className="border-b border-gray-800 last:border-b-0"
                     >
-                      <td className="p-3">{transaction.id}</td>
-                      <td className="p-3">{transaction.user_id}</td>
+                      <td className="p-3">#{transaction.id}</td>
+                      <td className="p-3">
+                        <div>
+                          <div className="font-medium text-white">
+                            {transaction.user_name || `User ${transaction.user_id}`}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            ID: {transaction.user_id}
+                          </div>
+                        </div>
+                      </td>
                       <td className="p-3">
                         <span
                           className={`px-2 py-1 rounded text-xs font-semibold ${
                             transaction.status === "pending"
                               ? "bg-yellow-600/50 text-yellow-100"
-                              : "bg-green-600/50 text-green-100"
+                              : transaction.status === "processing"
+                              ? "bg-blue-600/50 text-blue-100"
+                              : transaction.status === "shipped"
+                              ? "bg-purple-600/50 text-purple-100"
+                              : transaction.status === "delivered"
+                              ? "bg-green-600/50 text-green-100"
+                              : "bg-red-600/50 text-red-100"
                           }`}
                         >
-                          {transaction.status}
+                          {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
                         </span>
                       </td>
-                      <td className="p-3 text-gray-400">
+                      <td className="p-3">
+                        {editingMessage === transaction.id ? (
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={messageText}
+                              onChange={(e) => setMessageText(e.target.value)}
+                              className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-sm text-white"
+                              placeholder="Pickup instructions..."
+                            />
+                            <button
+                              onClick={() => handleSaveMessage(transaction.id)}
+                              disabled={messageLoading}
+                              className="bg-green-600 hover:bg-green-700 px-2 py-1 rounded text-xs"
+                            >
+                              {messageLoading ? <FaSpinner className="animate-spin" /> : "Save"}
+                            </button>
+                            <button
+                              onClick={handleCancelMessage}
+                              className="bg-gray-600 hover:bg-gray-700 px-2 py-1 rounded text-xs"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm text-gray-300 flex-1">
+                              {transaction.message || "No message"}
+                            </span>
+                            <button
+                              onClick={() => handleEditMessage(transaction)}
+                              className="text-blue-400 hover:text-blue-300"
+                              title="Edit pickup message"
+                            >
+                              <FaEdit className="text-xs" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3 text-gray-400 text-sm">
                         {new Date(transaction.created_at).toLocaleDateString()}
                       </td>
                       <td className="p-3 text-right font-bold text-white">
                         ${transaction.total_amount.toFixed(2)}
+                      </td>
+                      <td className="p-3 text-center">
+                        <button
+                          onClick={() => handleEditMessage(transaction)}
+                          className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-xs transition-colors"
+                          title="Add pickup instructions"
+                        >
+                          <FaEnvelope className="mr-1" />
+                          Message
+                        </button>
                       </td>
                     </tr>
                   ))}

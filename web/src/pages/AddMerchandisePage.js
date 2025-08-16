@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useParams } from "react-router-dom";
 import apiClient from "../components/utils/axios";
 import OrganizationNavbar from "../components/shared/OrganizationNavbar";
 import { FaBox, FaPlus } from "react-icons/fa";
@@ -6,6 +7,7 @@ import { toast } from "react-toastify";
 import { useAuth } from "../components/auth/AuthContext";
 
 const AddMerchandisePage = () => {
+  const { orgPrefix } = useParams();
   const { currentOrg } = useAuth();
   const [imageUrl, setImageUrl] = useState("");
   const [name, setName] = useState("");
@@ -16,7 +18,8 @@ const AddMerchandisePage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!currentOrg?.prefix) {
+    const prefixToUse = orgPrefix || currentOrg?.prefix;
+    if (!prefixToUse) {
       toast.error("No organization selected");
       return;
     }
@@ -31,7 +34,7 @@ const AddMerchandisePage = () => {
 
     try {
       // Updated API endpoint to include organization prefix
-      const response = await apiClient.post(`/api/merch/${currentOrg.prefix}/products`, productData);
+      const response = await apiClient.post(`/api/merch/${prefixToUse}/products`, productData);
       toast.success("Product added successfully!");
       // Reset form
       setImageUrl("");
@@ -41,7 +44,8 @@ const AddMerchandisePage = () => {
       setDescription("");
     } catch (error) {
       console.error("Error submitting form:", error);
-      const errorMessage = error.response?.data?.message ||
+      const errorMessage = error.response?.data?.error || 
+        error.response?.data?.message ||
         "Something went wrong while adding the product.";
       toast.error(errorMessage);
     }
@@ -63,7 +67,7 @@ const AddMerchandisePage = () => {
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">Add New Product</h1>
           <p className="text-gray-400">
-            Add a new item to {currentOrg.name}'s merchandise store
+            Add a new item to {(currentOrg || {name: 'the organization'}).name}'s merchandise store
           </p>
         </div>
 

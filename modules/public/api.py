@@ -29,8 +29,78 @@ def favicon():
 def get_next_event():
     pass
 
+# Helper function to get organization by prefix
+def get_organization_by_prefix(db, org_prefix):
+    from modules.organizations.models import Organization
+    org = db.query(Organization).filter(Organization.prefix == org_prefix).first()
+    if not org:
+        return None
+    return org
+
+@public_blueprint.route("/<string:org_prefix>/leaderboard", methods=["GET"])
+@error_handler
+def get_leaderboard(org_prefix):
+    """Get leaderboard for a specific organization"""
+    db = next(db_connect.get_db())
+    try:
+        from modules.points.models import UserOrganizationMembership
+        
+        # Get organization by prefix
+        org = get_organization_by_prefix(db, org_prefix)
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+
+        # Get all users who are members of this organization with their points
+        leaderboard_query = (
+            db.query(
+                User.name,
+                User.email,
+                User.asu_id,
+                func.coalesce(func.sum(Points.points), 0).label("total_points")
+            )
+            .join(UserOrganizationMembership, User.id == UserOrganizationMembership.user_id)
+            .outerjoin(Points, and_(
+                Points.user_id == User.id,
+                Points.organization_id == org.id
+            ))
+            .filter(UserOrganizationMembership.organization_id == org.id)
+            .filter(UserOrganizationMembership.is_active == True)
+            .group_by(User.id, User.name, User.email, User.asu_id)
+            .order_by(
+                func.sum(Points.points).desc(), User.name.asc()
+            )
+            .all()
+        )
+
+        # Format leaderboard data
+        leaderboard_data = []
+        for name, email, asu_id, total_points in leaderboard_query:
+            leaderboard_data.append({
+                "name": name,
+                "email": email,
+                "asu_id": asu_id,
+                "total_points": float(total_points) if total_points else 0.0
+            })
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    finally:
+        db.close()
+
+    # Return the leaderboard data
+    return jsonify({
+        "organization": {
+            "name": org.name,
+            "prefix": org.prefix,
+            "description": org.description
+        },
+        "leaderboard": leaderboard_data
+    }), 200
+
 @public_blueprint.route("/leaderboard", methods=["GET"])
-def get_leaderboard():
+@error_handler
+def get_global_leaderboard():
+    """Get global leaderboard (legacy endpoint - all organizations combined)"""
     start_date = datetime(2025, 1, 1) # Jan 1, 2025
     end_date = datetime(2025, 5, 12) # May 12, 2025
     db = next(db_connect.get_db())
@@ -98,4 +168,100 @@ def get_leaderboard():
         }
         for name, total_points, uuid, curr_sem_points in leaderboard
     ]), 200
+
+@public_blueprint.route("/<string:org_prefix>/users", methods=["GET"])
+@error_handler
+def get_organization_users(org_prefix):
+    """Get all users for a specific organization"""
+    db = next(db_connect.get_db())
+    try:
+        from modules.points.models import UserOrganizationMembership
+        
+        # Get organization by prefix
+        org = get_organization_by_prefix(db, org_prefix)
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+
+        # Get all users who are members of this organization
+        users_query = (
+            db.query(User)
+            .join(UserOrganizationMembership, User.id == UserOrganizationMembership.user_id)
+            .filter(UserOrganizationMembership.organization_id == org.id)
+            .filter(UserOrganizationMembership.is_active == True)
+            .all()
+        )
+        
+        return jsonify({
+            "organization": {
+                "name": org.name,
+                "prefix": org.prefix,
+                "description": org.description
+            },
+            "users": [
+                {
+                    "id": user.id,
+                    "name": user.name,
+                    "email": user.email,
+                    "asu_id": user.asu_id,
+                    "username": user.username,
+                    "discord_linked": bool(user.discord_id),
+                    "created_at": user.created_at.isoformat() if user.created_at else None
+                }
+                for user in users_query
+            ]
+        }), 200
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    finally:
+        db.close()
+
+@public_blueprint.route("/<string:org_prefix>/stats", methods=["GET"])
+@error_handler
+def get_organization_stats(org_prefix):
+    """Get statistics for a specific organization"""
+    db = next(db_connect.get_db())
+    try:
+        from modules.points.models import UserOrganizationMembership
+        
+        # Get organization by prefix
+        org = get_organization_by_prefix(db, org_prefix)
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+
+        # Get user count (members of this organization)
+        user_count = db.query(UserOrganizationMembership).filter(
+            UserOrganizationMembership.organization_id == org.id,
+            UserOrganizationMembership.is_active == True
+        ).count()
+        
+        # Get total points awarded in this organization
+        total_points = db.query(func.sum(Points.points)).filter(Points.organization_id == org.id).scalar() or 0
+        
+        # Get product count
+        from modules.merch.models import Product
+        product_count = db.query(Product).filter(Product.organization_id == org.id).count()
+        
+        # Get order count
+        from modules.merch.models import Order
+        order_count = db.query(Order).filter(Order.organization_id == org.id).count()
+        
+        return jsonify({
+            "organization": {
+                "name": org.name,
+                "prefix": org.prefix,
+                "description": org.description
+            },
+            "stats": {
+                "user_count": user_count,
+                "total_points_awarded": float(total_points),
+                "product_count": product_count,
+                "order_count": order_count
+            }
+        }), 200
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    finally:
+        db.close()
 
