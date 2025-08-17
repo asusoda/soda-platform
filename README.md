@@ -22,9 +22,8 @@ This project provides a modular internal API and Discord bots for the Software D
 
 ### Prerequisites
 
-- Python 3.8+
-- Poetry (dependency management)
-- Docker and Docker Compose (for deployment)
+- Podman and podman-compose
+- Make
 
 ### Development Setup
 
@@ -34,20 +33,7 @@ This project provides a modular internal API and Discord bots for the Software D
    cd soda-internal-api
    ```
 
-2. **Install dependencies using Poetry:**
-   ```bash
-   # Install Poetry if you don't have it yet
-   # See https://python-poetry.org/docs/#installation for more details
-   curl -sSL https://install.python-poetry.org | python3 -
-   
-   # Install project dependencies
-   poetry install
-   
-   # Activate the virtual environment
-   poetry shell
-   ```
-
-3. **Configure environment variables:**
+2. **Configure environment variables:**
    ```bash
    # Copy the template environment file
    cp .env.template .env
@@ -56,28 +42,41 @@ This project provides a modular internal API and Discord bots for the Software D
    # This includes API keys, Discord bot token, etc.
    ```
 
-4. **Run the application:**
+3. **Start the development environment:**
    ```bash
-   # Using Poetry
-   poetry run python main.py
-   
-   # Or if already in Poetry shell
-   python main.py
+   make dev
    ```
 
-## 🧪 Testing
+That's it! The application will be available at:
+- API: http://localhost:8000
+- Web Frontend: http://localhost:5000
 
-This project uses pytest for automated testing:
+## 🛠️ Common Commands
 
 ```bash
-# Run all tests
-pytest
+# Start development environment (with logs)
+make dev
 
-# Run specific test file
-pytest tests/test_specific_module.py
+# Start services in background
+make up
 
-# Run with coverage report
-pytest --cov=modules
+# Stop services
+make down
+
+# View logs
+make logs
+
+# Check container status
+make status
+
+# Open shell in API container
+make shell
+
+# Build images
+make build
+
+# Deploy to production
+make deploy
 ```
 
 ## 🔄 Discord Integration
@@ -94,53 +93,21 @@ The API integrates with Discord for notifications and interactions. To set up a 
 
 ## 🚢 Deployment
 
-### Using Docker Compose (Recommended)
-
-The project uses Docker Compose for deployment and management.
-
-#### Quick Start Commands
+### Production Deployment
 
 ```bash
-# Development environment
-make dev
-
-# Production deployment
+# Deploy to production
 make deploy
-
-# View logs
-make logs
-
-# Stop services
-make down
 ```
 
-#### Manual Docker Compose Commands
-
-```bash
-# Build the Docker image
-docker-compose build
-
-# Start services
-docker-compose up -d
-
-# Stop services
-docker-compose down
-
-# View logs
-docker-compose logs -f
-```
-
-#### Deployment Process
-
-The `make deploy` command automates the entire deployment:
-
+The `make deploy` command automates the entire deployment process:
 1. Pulls latest changes from git
-2. Builds the Docker image
+2. Builds container images
 3. Manages container lifecycle
 4. Performs health checks
 5. Shows deployment status
 
-#### Customizing Deployment
+### Customizing Deployment
 
 ```bash
 # Deploy from a different directory
@@ -150,14 +117,9 @@ make deploy PROJECT_DIR=/path/to/project
 make deploy BRANCH=develop
 ```
 
-### Docker Configuration
-
-- `docker-compose.yml` - Main configuration for all environments
-- `.dockerignore` - Optimizes build context
-
 ### Data Persistence
 
-The application data is stored in the `./data` directory, which is mounted as a volume in the container for persistence across container restarts.
+Application data is stored in the `./data` directory, mounted as a volume for persistence across container restarts.
 
 ## 📝 Contributing
 
