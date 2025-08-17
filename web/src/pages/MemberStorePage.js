@@ -544,7 +544,7 @@ const MemberStorePage = () => {
                     )}
                     <div className="flex justify-between items-center mb-4">
                       <span className="text-2xl font-bold text-green-400">
-                        ${product.price.toFixed(2)}
+                        {product.price.toFixed(2)}
                       </span>
                       <span className="text-sm text-gray-400">
                         {product.stock} in stock
@@ -611,7 +611,7 @@ const MemberStorePage = () => {
                               {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                             </div>
                             <p className="text-lg font-bold text-green-400 mt-2">
-                              ${order.total_amount.toFixed(2)}
+                              {order.total_amount.toFixed(2)}
                             </p>
                           </div>
                         </div>
@@ -622,7 +622,7 @@ const MemberStorePage = () => {
                               {order.items.map((item, index) => (
                                 <div key={index} className="flex justify-between text-sm">
                                   <span>{item.product_name || `Product #${item.product_id}`}</span>
-                                  <span>{item.quantity} × ${item.price_at_time.toFixed(2)}</span>
+                                  <span>{item.quantity} × {item.price_at_time.toFixed(2)}</span>
                                 </div>
                               ))}
                             </div>
@@ -671,7 +671,7 @@ const MemberStorePage = () => {
                         <div className="flex-1">
                           <h4 className="font-semibold">{item.product.name}</h4>
                           <p className="text-sm text-gray-400">
-                            ${item.product.price.toFixed(2)} each
+                            {item.product.price.toFixed(2)} each
                           </p>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -698,7 +698,7 @@ const MemberStorePage = () => {
                       </div>
                       <div className="text-right mt-2">
                         <span className="font-semibold">
-                          ${(item.quantity * item.product.price).toFixed(2)}
+                          {(item.quantity * item.product.price).toFixed(2)}
                         </span>
                       </div>
                     </div>
@@ -708,7 +708,7 @@ const MemberStorePage = () => {
                 <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
                   <div className="flex justify-between items-center text-xl font-bold mb-4">
                     <span>Total:</span>
-                    <span className="text-green-400">${getTotalPrice().toFixed(2)}</span>
+                    <span className="text-green-400">{getTotalPrice().toFixed(2)}</span>
                   </div>
 
                   {!isAuthenticated && (

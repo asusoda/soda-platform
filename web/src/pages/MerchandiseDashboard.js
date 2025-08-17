@@ -211,7 +211,7 @@ const MerchandiseDashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-400 text-sm">Total Revenue</p>
-                    <p className="text-2xl font-bold text-white">${stats.totalRevenue.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-white">{stats.totalRevenue.toFixed(2)}</p>
                   </div>
                   <FaChartBar className="text-yellow-400 text-2xl" />
                 </div>
@@ -258,7 +258,7 @@ const MerchandiseDashboard = () => {
                       )}
                       <div className="flex justify-between items-center mb-3">
                         <span className="text-lg font-bold text-green-400">
-                          ${product.price.toFixed(2)}
+                          {product.price.toFixed(2)}
                         </span>
                         <span className={`text-sm px-2 py-1 rounded ${
                           product.stock <= 5 ? 'bg-red-600/50 text-red-100' : 'bg-green-600/50 text-green-100'
@@ -343,7 +343,7 @@ const MerchandiseDashboard = () => {
                             {new Date(order.created_at).toLocaleDateString()}
                           </td>
                           <td className="p-3 text-right font-bold text-white">
-                            ${order.total_amount.toFixed(2)}
+                            {order.total_amount.toFixed(2)}
                           </td>
                           <td className="p-3 text-center">
                             <span className="text-blue-400 text-sm">

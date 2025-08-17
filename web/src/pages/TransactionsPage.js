@@ -322,7 +322,7 @@ const TransactionsPage = () => {
                         {new Date(transaction.created_at).toLocaleDateString()}
                       </td>
                       <td className="p-3 text-right font-bold text-white">
-                        ${transaction.total_amount.toFixed(2)}
+                        {transaction.total_amount.toFixed(2)}
                       </td>
                       <td className="p-3 text-center">
                         <button
