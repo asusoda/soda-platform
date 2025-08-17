@@ -3,7 +3,7 @@
 # Configuration
 PROJECT_DIR ?= /var/www/soda-internal-api
 BRANCH ?= main
-COMPOSE_CMD := $(shell if docker compose version > /dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
+COMPOSE_CMD := $(shell if command -v podman-compose > /dev/null 2>&1; then echo "podman-compose"; elif docker compose version > /dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
 
 # Colors for output
 RED := \033[0;31m
