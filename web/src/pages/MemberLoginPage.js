@@ -41,8 +41,7 @@ const MemberLoginPage = () => {
 
     setLoading(true);
     try {
-      const response = await apiClient.post('/api/points/member_login', {
-        organization_prefix: orgPrefix,
+      const response = await apiClient.post(`/api/points/${orgPrefix}/member_login`, {
         ...formData
       });
 

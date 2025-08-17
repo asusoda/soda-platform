@@ -110,7 +110,7 @@ const MemberStorePage = () => {
     if (!isAuthenticated || !orgPrefix) return;
     
     try {
-      const response = await apiClient.get(`/api/points/member_profile?organization_prefix=${orgPrefix}`);
+      const response = await apiClient.get(`/api/points/${orgPrefix}/member_profile`);
       setMemberProfile(response.data);
       setUserPoints(response.data.current_organization?.points || 0);
     } catch (err) {

@@ -44,6 +44,10 @@ const AddPoints = () => {
       alert('Please fill all fields and select a file for event CSV upload.');
       return;
     }
+    if (!currentOrg?.prefix) {
+      alert('No organization selected.');
+      return;
+    }
     
     // FileUpload component passes an array, so get the first file
     const fileToUpload = Array.isArray(eventFile) ? eventFile[0] : eventFile;
@@ -58,7 +62,7 @@ const AddPoints = () => {
     formData.append('event_name', eventName);
     formData.append('event_points', eventPoints);
     try {
-      const response = await apiClient.post('/api/points/uploadEventCSV', formData);
+      const response = await apiClient.post(`/api/points/${currentOrg.prefix}/uploadEventCSV`, formData);
       alert(response.data.message || 'File uploaded successfully!');
       setEventFile(null); setEventName(''); setEventPoints('');
     } catch (error) {
@@ -72,9 +76,14 @@ const AddPoints = () => {
       alert('Please fill all fields for assigning points.');
       return;
     }
+    if (!currentOrg?.prefix) {
+      alert('No organization selected.');
+      return;
+    }
+    
     const data = { user_identifier: userIdentifier, points: userPoints, event, awarded_by_officer: awardedByOfficer };
     try {
-      const response = await apiClient.post('/api/points/assign_points', data);
+      const response = await apiClient.post(`/api/points/${currentOrg.prefix}/assign_points`, data);
       alert(response.data.message || 'Points assigned successfully!');
       setUserIdentifier(''); setUserPoints(''); setEvent(''); setAwardedByOfficer('');
     } catch (error) {

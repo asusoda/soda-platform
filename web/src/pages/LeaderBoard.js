@@ -5,7 +5,7 @@ import useOrgNavigation from '../hooks/useOrgNavigation';
 import { useAuth } from '../components/auth/AuthContext';
 import OrganizationNavbar from '../components/shared/OrganizationNavbar';
 import StarBorder from '../components/ui/StarBorder';
-import { FaUsers, FaSignOutAlt, FaTachometerAlt, FaClipboardList, FaTrashAlt, FaTimes, FaCogs } from 'react-icons/fa';
+import { FaUsers, FaSignOutAlt, FaTachometerAlt, FaClipboardList, FaTrashAlt, FaTimes, FaCogs, FaEdit, FaSave } from 'react-icons/fa';
 
 const LeaderboardPage = () => {
   useAuthToken();
@@ -32,6 +32,11 @@ const LeaderboardPage = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [pointToDelete, setPointToDelete] = useState(null);
 
+  // Enhanced admin features
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFormData, setEditFormData] = useState({});
+  const [saveLoading, setSaveLoading] = useState(false);
+
   const handleDeleteClick = (event) => {
     setPointToDelete(event);
     setShowConfirmModal(true);
@@ -43,7 +48,7 @@ const LeaderboardPage = () => {
       try {
         await apiClient.request({
           method: 'DELETE',
-          url: '/api/points/delete_points',
+          url: `/api/points/${currentOrg.prefix}/delete_points`,
           data: {
             user_email: selectedUserEmail,
             event: pointToDelete.event
@@ -63,15 +68,67 @@ const LeaderboardPage = () => {
   const viewUserDetails = async (userEmail) => {
     setLoadingUser(true);
     setModalError('');
+    setIsEditing(false); // Reset editing state
     try {
-      const response = await apiClient.get(`/api/users/user?email=${encodeURIComponent(userEmail)}`);
-      setSelectedUser(response.data);
+      // Use the new consolidated endpoint to get user details with points history
+      const response = await apiClient.get(`/api/points/${currentOrg.prefix}/users/${encodeURIComponent(userEmail)}/points`);
+      const userData = {
+        ...response.data.user,
+        points_history: response.data.points_history || [],
+        total_points: response.data.total_points || 0
+      };
+      setSelectedUser(userData);
+      setEditFormData({
+        name: userData.name || '',
+        username: userData.username || '',
+        asu_id: userData.asu_id || '',
+        academic_standing: userData.academic_standing || '',
+        major: userData.major || ''
+      });
       setSelectedUserEmail(userEmail);
       setShowModal(true);
     } catch (error) {
       setModalError(error.response?.data?.error || 'Failed to fetch user details');
     } finally {
       setLoadingUser(false);
+    }
+  };
+
+  const handleEditToggle = () => {
+    setIsEditing(!isEditing);
+    setModalError('');
+  };
+
+  const handleEditFormChange = (field, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleSaveUser = async () => {
+    setSaveLoading(true);
+    setModalError('');
+    
+    try {
+      const response = await apiClient.put(
+        `/api/points/${currentOrg.prefix}/users/${encodeURIComponent(selectedUserEmail)}`,
+        editFormData
+      );
+      
+      // Update the selected user data
+      setSelectedUser(prev => ({
+        ...prev,
+        ...editFormData
+      }));
+      
+      setIsEditing(false);
+      // Refresh leaderboard to show updated information
+      fetchLeaderboard();
+    } catch (error) {
+      setModalError(error.response?.data?.error || 'Failed to update user information');
+    } finally {
+      setSaveLoading(false);
     }
   };
 
@@ -180,12 +237,43 @@ const LeaderboardPage = () => {
             <div className="bg-gray-900 rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-white">User Details</h2>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  <FaTimes size={24} />
-                </button>
+                <div className="flex items-center space-x-2">
+                  {!isEditing ? (
+                    <button
+                      onClick={handleEditToggle}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-md transition-colors flex items-center"
+                      title="Edit user information"
+                    >
+                      <FaEdit className="mr-1" size={12} />
+                      Edit
+                    </button>
+                  ) : (
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={handleSaveUser}
+                        disabled={saveLoading}
+                        className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white text-sm rounded-md transition-colors flex items-center"
+                        title="Save changes"
+                      >
+                        <FaSave className="mr-1" size={12} />
+                        {saveLoading ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={handleEditToggle}
+                        className="px-3 py-1 bg-gray-600 hover:bg-gray-700 text-white text-sm rounded-md transition-colors"
+                        title="Cancel editing"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowModal(false)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <FaTimes size={24} />
+                  </button>
+                </div>
               </div>
 
               {loadingUser ? (
@@ -200,31 +288,94 @@ const LeaderboardPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Name</label>
-                      <p className="text-white">{selectedUser.name || 'N/A'}</p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editFormData.name}
+                          onChange={(e) => handleEditFormChange('name', e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                        />
+                      ) : (
+                        <p className="text-white">{selectedUser.name || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editFormData.username}
+                          onChange={(e) => handleEditFormChange('username', e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                          placeholder="Optional username"
+                        />
+                      ) : (
+                        <p className="text-white">{selectedUser.username || 'N/A'}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Email</label>
                       <p className="text-white">{selectedUser.email}</p>
+                      <p className="text-xs text-gray-500">Email cannot be changed</p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">ASU ID</label>
-                      <p className="text-white">{selectedUser.asu_id || 'N/A'}</p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editFormData.asu_id}
+                          onChange={(e) => handleEditFormChange('asu_id', e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                          placeholder="10-digit ASU ID"
+                        />
+                      ) : (
+                        <p className="text-white">{selectedUser.asu_id || 'N/A'}</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-1">Academic Standing</label>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editFormData.academic_standing}
+                          onChange={(e) => handleEditFormChange('academic_standing', e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                          placeholder="e.g., Sophomore"
+                        />
+                      ) : (
+                        <p className="text-white">{selectedUser.academic_standing || 'N/A'}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-1">Major</label>
-                      <p className="text-white">{selectedUser.major || 'N/A'}</p>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editFormData.major}
+                          onChange={(e) => handleEditFormChange('major', e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                          placeholder="e.g., Computer Science"
+                        />
+                      ) : (
+                        <p className="text-white">{selectedUser.major || 'N/A'}</p>
+                      )}
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Points History</label>
-                    <div className="space-y-2">
-                      {selectedUser.points && selectedUser.points.length > 0 ? (
-                        selectedUser.points.map((point, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-                            <div>
-                              <div className="text-white font-medium">{point.event}</div>
-                              <div className="text-sm text-gray-400">{point.date}</div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {selectedUser.points_history && selectedUser.points_history.length > 0 ? (
+                        selectedUser.points_history.map((point, index) => (
+                          <div key={point.id || index} className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                            <div className="flex-1">
+                              <div className="text-white font-medium">{point.event || 'No event specified'}</div>
+                              <div className="text-sm text-gray-400">
+                                {point.timestamp ? new Date(point.timestamp).toLocaleDateString() : 'Unknown date'}
+                                {point.awarded_by_officer && (
+                                  <span className="ml-2">• Awarded by: {point.awarded_by_officer}</span>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center space-x-2">
                               <span className="text-green-400 font-bold">+{point.points}</span>
