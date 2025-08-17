@@ -29,18 +29,21 @@ class Order(Base):
     
     id = Column(Integer, primary_key=True)
     organization_id = Column(Integer, ForeignKey('organizations.id'), nullable=False)
-    user_id = Column(String(50), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    discord_user_id = Column(String(50), nullable=True)  # Keep for backward compatibility
     total_amount = Column(Float, nullable=False)
     status = Column(String(20), default='pending')
+    message = Column(Text, nullable=True)  # Admin message for pickup instructions
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     organization = relationship("Organization", backref="orders")
+    user = relationship("User", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f"<Order(id={self.id}, user_id='{self.user_id}', total_amount={self.total_amount}, status='{self.status}', org_id={self.organization_id})>"
+        return f"<Order(id={self.id}, user_id={self.user_id}, total_amount={self.total_amount}, status='{self.status}', org_id={self.organization_id})>"
 
 class OrderItem(Base):
     __tablename__ = "order_items"

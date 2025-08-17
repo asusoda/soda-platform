@@ -228,6 +228,33 @@ class BotFork(commands.Bot):
         guild = super().get_guild(guild_id)
         member = guild.get_member(user_id)
         return role_id in [role.id for role in member.roles]
+    
+    def check_user_membership(self, user_id: int, guild_id: int) -> bool:
+        """
+        Check if a user is a member of a specific guild.
+        Returns True if the user is a member, False otherwise.
+        """
+        try:
+            print(f"🔍 [DEBUG] check_user_membership called for user_id: {user_id}, guild_id: {guild_id}")
+            
+            guild = super().get_guild(guild_id)
+            if not guild:
+                print(f"❌ [DEBUG] Guild not found: {guild_id}")
+                return False
+            
+            member = guild.get_member(user_id)
+            if not member:
+                print(f"❌ [DEBUG] User {user_id} is not a member of guild {guild_id}")
+                return False
+            
+            print(f"✅ [DEBUG] User {member.display_name} is a member of {guild.name}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ [DEBUG] Error checking membership: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
     # async def setup_game(self):
     #     """

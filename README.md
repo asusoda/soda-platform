@@ -45,6 +45,7 @@ That's it! The application will be available at:
 - API: http://localhost:8000
 - Web Frontend: http://localhost:5000
 
+
 ## Common Commands
 
 ```bash
@@ -63,6 +64,9 @@ make logs
 # Check container status
 make status
 
+
+### Customizing Deployment
+
 # Open shell in API container
 make shell
 
@@ -72,6 +76,7 @@ make build
 # Deploy to production
 make deploy
 ```
+
 
 ## Contributing
 

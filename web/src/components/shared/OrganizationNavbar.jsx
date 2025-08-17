@@ -35,7 +35,10 @@ const OrganizationNavbar = ({ children }) => {
   const goToJeopardy = () => navigate(`/${currentOrg?.prefix}/jeopardy`);
   const goToGamePanel = () => navigate(`/${currentOrg?.prefix}/gamepanel`);
   const goToActiveGame = () => navigate(`/${currentOrg?.prefix}/activegame`);
-  const goToStorefront = () => navigate(`/${currentOrg?.prefix}/storefront`);
+  const goToMerchDashboard = () => navigate(`/${currentOrg?.prefix}/merch/dashboard`);
+  const goToAddMerch = () => navigate(`/${currentOrg?.prefix}/add-merchandise`);
+  const goToTransactions = () => navigate(`/${currentOrg?.prefix}/transactions`);
+  const goToMemberStore = () => window.open(`/store/${currentOrg?.prefix}`, '_blank');
   const goToCalendar = () => navigate(`/${currentOrg?.prefix}/calendar`);
   const goToDiscordBots = () => navigate(`/${currentOrg?.prefix}/discord-bots`);
 
@@ -108,18 +111,23 @@ const OrganizationNavbar = ({ children }) => {
                   </div>
                   <ul className="space-y-2">
                     <li>
-                      <HoveredLink onClick={goToStorefront} className="block p-2 rounded hover:bg-green-400/20 hover:text-green-300 transition-all duration-200 text-sm text-gray-300">
-                        • Merchandise
+                      <HoveredLink onClick={goToMerchDashboard} className="block p-2 rounded hover:bg-green-400/20 hover:text-green-300 transition-all duration-200 text-sm text-gray-300">
+                        • Admin Dashboard
                       </HoveredLink>
                     </li>
                     <li>
-                      <HoveredLink onClick={goToStorefront} className="block p-2 rounded hover:bg-green-400/20 hover:text-green-300 transition-all duration-200 text-sm text-gray-300">
-                        • Add Products
+                      <HoveredLink onClick={goToMemberStore} className="block p-2 rounded hover:bg-blue-400/20 hover:text-blue-300 transition-all duration-200 text-sm text-gray-300">
+                        • Store & Orders
                       </HoveredLink>
                     </li>
                     <li>
-                      <HoveredLink onClick={goToStorefront} className="block p-2 rounded hover:bg-green-400/20 hover:text-green-300 transition-all duration-200 text-sm text-gray-300">
-                        • Orders
+                      <HoveredLink onClick={goToAddMerch} className="block p-2 rounded hover:bg-green-400/20 hover:text-green-300 transition-all duration-200 text-sm text-gray-300">
+                        • Add Products (Admin)
+                      </HoveredLink>
+                    </li>
+                    <li>
+                      <HoveredLink onClick={goToTransactions} className="block p-2 rounded hover:bg-green-400/20 hover:text-green-300 transition-all duration-200 text-sm text-gray-300">
+                        • Manage Orders (Admin)
                       </HoveredLink>
                     </li>
                   </ul>
