@@ -143,9 +143,6 @@ rollback:
 status:
 	@echo -e "$(GREEN)[INFO]$(NC) Container status:"
 	@$(COMPOSE_CMD) ps
-	@echo ""
-	@echo -e "$(GREEN)[INFO]$(NC) Container resource usage:"
-	@$(COMPOSE_CMD) stats --no-stream --no-reset
 
 # Health check
 health:
