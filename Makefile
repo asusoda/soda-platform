@@ -30,7 +30,7 @@ help:
 # Build Docker images
 build:
 	@echo -e "$(GREEN)[INFO]$(NC) Building Docker images with BuildKit..."
-	@DOCKER_BUILDKIT=1 $(COMPOSE_CMD) build --parallel
+	@DOCKER_BUILDKIT=1 $(COMPOSE_CMD) build
 
 # Build only API
 build-api:

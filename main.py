@@ -1,4 +1,4 @@
-from flask import Flask, current_app # Import current_app
+from flask import Flask, current_app, jsonify # Import current_app
 from shared import app, logger, config, create_summarizer_bot, create_auth_bot
 from modules.utils.sync_utility import UnifiedSyncService
 from modules.calendar.service import MultiOrgCalendarService
@@ -43,6 +43,11 @@ app.multi_org_calendar_service = multi_org_calendar_service
 # Instantiate and attach UnifiedSyncService after app is defined
 unified_sync_service = UnifiedSyncService(logger)
 app.unified_sync_service = unified_sync_service
+
+# Health endpoint
+@app.route('/health')
+def health():
+    return jsonify({'status': 'healthy', 'service': 'soda-internal-api'}), 200
 
 # Register Blueprints
 app.register_blueprint(public_blueprint, url_prefix="/api/public")
