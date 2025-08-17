@@ -8,7 +8,6 @@ from modules.auth.decoraters import auth_required, error_handler
 from modules.points.models import User, Points
 from shared import config, db_connect
 from sqlalchemy import func
-from sqlalchemy import func
 
 # Flask Blueprint for users
 users_blueprint = Blueprint("users", __name__, template_folder=None, static_folder=None)
@@ -26,7 +25,6 @@ def view_user_in_org(org_prefix):
     organization_id = request.args.get('organization_id')
 
     if not user_identifier:
-        return jsonify({"error": "User identifier (email, UUID, or username) is required."}), 400
         return jsonify({"error": "User identifier (email, UUID, or username) is required."}), 400
 
     db = next(db_connect.get_db())
@@ -86,17 +84,12 @@ def view_user_in_org(org_prefix):
         } for record in points_records]
 
         # Prepare the user data
-        # Prepare the user data
         user_data = {
-            "id": user.id,
             "id": user.id,
             "name": user.name,
             "username": user.username,
             "email": user.email,
-            "username": user.username,
-            "email": user.email,
             "uuid": user.uuid,
-            "asu_id": user.asu_id,
             "asu_id": user.asu_id,
             "academic_standing": user.academic_standing,
             "major": user.major,
@@ -175,7 +168,7 @@ def create_user_in_org(org_prefix):
             email=user_email,
             name=user_name,
             username=None,  # Can be set later
-            asu_id=user_asu_id or 'N/A',
+            asu_id=user_asu_id if user_asu_id and user_asu_id != 'N/A' else None,
             academic_standing=user_academic_standing or 'N/A',
             major='N/A',
             uuid=str(uuid.uuid4())
@@ -288,7 +281,7 @@ def user_in_org(org_prefix):
                     name=data.get('name'),
                     email=user_email,
                     username=None,  # Can be set later
-                    asu_id=data.get('asu_id', 'N/A'),
+                    asu_id=data.get('asu_id') if data.get('asu_id') and data.get('asu_id') != 'N/A' else None,
                     academic_standing=data.get('academic_standing', 'N/A'),
                     major=data.get('major', 'N/A'),
                     uuid=str(uuid.uuid4())
@@ -329,7 +322,6 @@ def handle_form_submission_in_org(org_prefix):
     
     return jsonify({"message": "recieved id: " + discordID + " and role: " + role}), 200
 
-# Organization-prefix based endpoints
 @users_blueprint.route("/<string:org_prefix>/users", methods=["GET"])
 @auth_required
 @error_handler
@@ -511,7 +503,7 @@ def add_user_to_organization(org_prefix):
             'username': data.get('username'),
             'email': data.get('email'),
             'name': data.get('name'),
-            'asu_id': data.get('asu_id', 'N/A'),
+            'asu_id': data.get('asu_id') if data.get('asu_id') and data.get('asu_id') != 'N/A' else None,
             'academic_standing': data.get('academic_standing', 'N/A'),
             'major': data.get('major', 'N/A')
         }
