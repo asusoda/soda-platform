@@ -1,9 +1,10 @@
-.PHONY: help build up down logs shell clean deploy dev prod rollback status health-check
+.PHONY: help build up down logs shell clean deploy dev prod rollback status health
 
 # Configuration
 PROJECT_DIR ?= /var/www/soda-internal-api
 BRANCH ?= main
 COMPOSE_CMD := $(shell if command -v podman-compose > /dev/null 2>&1; then echo "podman-compose"; elif docker compose version > /dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
+CONTAINER_CMD := $(shell if command -v podman > /dev/null 2>&1; then echo "podman"; else echo "docker"; fi)
 
 # Colors for output
 RED := \033[0;31m
@@ -14,10 +15,11 @@ NC := \033[0m
 # Default target
 help:
 	@echo "Available commands:"
-	@echo "  make build       - Build Docker images"
+	@echo "  make build       - Build container images"
 	@echo "  make up          - Start services in development mode"
 	@echo "  make down        - Stop and remove containers"
-	@echo "  make logs        - View container logs"
+	@echo "  make logs        - View last 50 lines of container logs"
+	@echo "  make logs-follow - Follow container logs continuously"
 	@echo "  make shell       - Open shell in API container"
 	@echo "  make clean       - Clean up containers and images"
 	@echo "  make deploy      - Deploy to production (pull, build, restart)"
@@ -25,11 +27,11 @@ help:
 	@echo "  make prod        - Start production environment locally"
 	@echo "  make rollback    - Rollback to previous version"
 	@echo "  make status      - Show container status"
-	@echo "  make health-check - Check container health"
+	@echo "  make health      - Check container health"
 
-# Build Docker images
+# Build container images
 build:
-	@echo -e "$(GREEN)[INFO]$(NC) Building Docker images with BuildKit..."
+	@echo -e "$(GREEN)[INFO]$(NC) Building container images with BuildKit..."
 	@DOCKER_BUILDKIT=1 $(COMPOSE_CMD) build
 
 # Build only API
@@ -52,8 +54,12 @@ down:
 	@echo -e "$(GREEN)[INFO]$(NC) Stopping services..."
 	@$(COMPOSE_CMD) down
 
-# View logs
+# View logs (batch-friendly, last 50 lines)
 logs:
+	@$(COMPOSE_CMD) logs --tail=50
+
+# Follow logs (continuous)
+logs-follow:
 	@$(COMPOSE_CMD) logs -f
 
 # Open shell in API container
@@ -64,7 +70,7 @@ shell:
 clean:
 	@echo -e "$(YELLOW)[WARNING]$(NC) Cleaning up containers and volumes..."
 	@$(COMPOSE_CMD) down -v
-	@docker system prune -f
+	@$(CONTAINER_CMD) system prune -f
 
 # Deploy to production
 deploy:
@@ -82,9 +88,9 @@ deploy:
 	@chmod -R 755 data
 	@chown -R 1000:1000 data
 	@echo -e "$(GREEN)[INFO]$(NC) Tagging current version as previous..."
-	@docker tag soda-internal-api:latest soda-internal-api:previous 2>/dev/null || true
-	@echo -e "$(GREEN)[INFO]$(NC) Building Docker image..."
-	@DOCKER_BUILDKIT=1 $(COMPOSE_CMD) -f docker-compose.yml build || (echo -e "$(RED)[ERROR]$(NC) Failed to build Docker image"; exit 1)
+	@$(CONTAINER_CMD) tag soda-internal-api:latest soda-internal-api:previous 2>/dev/null || true
+	@echo -e "$(GREEN)[INFO]$(NC) Building container image..."
+	@DOCKER_BUILDKIT=1 $(COMPOSE_CMD) -f docker-compose.yml build || (echo -e "$(RED)[ERROR]$(NC) Failed to build container image"; exit 1)
 	@echo -e "$(GREEN)[INFO]$(NC) Stopping existing containers..."
 	@$(COMPOSE_CMD) -f docker-compose.yml down
 	@echo -e "$(GREEN)[INFO]$(NC) Starting containers..."
@@ -121,10 +127,10 @@ prod:
 # Rollback to previous version
 rollback:
 	@echo -e "$(YELLOW)[WARNING]$(NC) Rolling back to previous version..."
-	@if docker images | grep -q "soda-internal-api:previous"; then \
+	@if $(CONTAINER_CMD) images | grep -q "soda-internal-api:previous"; then \
 		echo -e "$(GREEN)[INFO]$(NC) Found previous version, rolling back..."; \
-		docker tag soda-internal-api:latest soda-internal-api:rollback-$$(date +%Y%m%d-%H%M%S); \
-		docker tag soda-internal-api:previous soda-internal-api:latest; \
+		$(CONTAINER_CMD) tag soda-internal-api:latest soda-internal-api:rollback-$$(date +%Y%m%d-%H%M%S); \
+		$(CONTAINER_CMD) tag soda-internal-api:previous soda-internal-api:latest; \
 		$(COMPOSE_CMD) up -d; \
 		echo -e "$(GREEN)[INFO]$(NC) Rollback completed!"; \
 		$(COMPOSE_CMD) ps; \
@@ -137,13 +143,12 @@ rollback:
 status:
 	@echo -e "$(GREEN)[INFO]$(NC) Container status:"
 	@$(COMPOSE_CMD) ps
-	@echo
+	@echo ""
 	@echo -e "$(GREEN)[INFO]$(NC) Container resource usage:"
-	@docker stats --no-stream $$($(COMPOSE_CMD) ps -q) 2>/dev/null || true
+	@$(COMPOSE_CMD) stats --no-stream --no-reset
 
 # Health check
-health-check:
-	@echo -e "$(GREEN)[INFO]$(NC) Checking container health..."
+health:
 	@if $(COMPOSE_CMD) ps | grep -q "healthy"; then \
 		echo -e "$(GREEN)✅ Container is healthy!$(NC)"; \
 	elif $(COMPOSE_CMD) ps | grep -q "unhealthy"; then \
@@ -152,5 +157,5 @@ health-check:
 		$(COMPOSE_CMD) logs --tail=50; \
 		exit 1; \
 	else \
-		echo -e "$(YELLOW)⚠️  No health check configured or container not running$(NC)"; \
+		echo -e "$(YELLOW)⚠️  Can't determine health (run make status to sanity check)$(NC)"; \
 	fi
