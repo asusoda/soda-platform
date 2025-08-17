@@ -40,7 +40,7 @@ jobs:
           
           # Verify deployment health
           echo "Verifying deployment health..."
-          make health-check || {
+          make health || {
             echo "Health check failed!"
             make status
             exit 1
