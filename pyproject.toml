@@ -23,7 +23,7 @@ dependencies = [
     "flask-discord==0.1.69",
     "flask-socketio==5.3.6",
     "flask-sqlalchemy==3.1.1",
-    "frozenlist==1.4.0",
+    "frozenlist==1.7.0",
     "greenlet==3.0.3",
     "h11==0.16.0",
     "idna==3.7",
