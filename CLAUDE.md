@@ -31,13 +31,13 @@ make build
 ### Testing
 ```bash
 # Run all tests
-poetry run pytest -v
+uv run pytest -v
 
 # Run specific test file
-poetry run pytest tests/test_filename.py -v
+uv run pytest tests/test_filename.py -v
 
 # Install dependencies for testing
-poetry install --no-interaction --no-root
+uv sync
 ```
 
 ### Deployment
@@ -109,7 +109,7 @@ Active modules: auth, bot, calendar, merch, ocp, organizations, points, public, 
 
 ### Testing Environment
 - Set `TESTING=true` environment variable for test runs
-- Poetry manages Python dependencies and virtual environment
+- uv manages Python dependencies and virtual environment
 - GitHub Actions runs tests automatically on push/PR
 
 ### Container Architecture
