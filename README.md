@@ -1,5 +1,3 @@
-<img src="./web/public/logo-dark.svg" alt="SoDA Logo" style="max-width: 300px;">
-
 This project provides a modular internal API and Discord bots for the Software Developers Association (SoDA) at ASU. The server side is developed using Flask, handling API requests, Discord bot interactions, and data management across all modules.
 
 ## Directory
