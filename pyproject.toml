@@ -3,7 +3,7 @@ name = "soda-platform"
 version = "0.1.0"
 description = "SoDA Platform"
 authors = [{name = "SoDA", email = "asu@thesoda.io"}]
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "aiohttp>=3.11.16",
     "aiosignal==1.3.1",
