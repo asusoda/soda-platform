@@ -1,53 +1,64 @@
-# TANAY API
-This project provides a modular internal API and Discord bots for SoDA. 
+# T'NAY API
+
+This project provides a modular internal API and Discord bots for SoDA.
 
 The server side is developed using Flask, handling API requests, Discord bot interactions, and data management across all modules.
 
 See the READMEs for more detailed documentation on the respective modules in `./modules`
 
 ## Development Setup
+
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/asusoda/soda-internal-api.git
    ```
+
 2. Install dependencies using Poetry:
+
    ```bash
    # Install Poetry if you don't have it yet
    # See https://python-poetry.org/docs/#installation for more details
    curl -sSL https://install.python-poetry.org | python3 -
-   
+
    # Install project dependencies
    poetry install
-   
+
    # Activate the virtual environment
    poetry shell
    ```
 
-4. Edit the secret values
-  Copy the .env.template to .env
-      ```bash
-      cp .env.template .env
-      ```
-      Edit the .env file to provide the necessary configuration values, such as API keys, Discord bot token, and other credentials.
+3. Edit the secret values
+   Copy the .env.template to .env
 
-5. Run the program 
-      ```bash
-      poetry run python main.py
-      
-      # If using activated virtual environment
-      python main.py
-      ```
+   ```bash
+   cp .env.template .env
+   ```
+
+   Edit the .env file to provide the necessary configuration values, such as API keys, Discord bot token, and other credentials.
+
+4. Run the program
+
+   ```bash
+   poetry run python main.py
+
+   # If using activated virtual environment
+   python main.py
+
+   ```
 
 ## Testing
 
 This project uses pytest for automated testing. To run the tests:
 
 1. Make sure you have the development dependencies installed:
+
    ```bash
    poetry install
    ```
-
+   
 2. Run all tests:
+
    ```bash
    pytest          # If pytest is in your PATH
    # OR
@@ -106,6 +117,7 @@ The `make deploy` command automates the entire deployment:
 5. Shows deployment status
 
 You can customize the deployment with environment variables:
+
 ```bash
 # Deploy from a different directory
 make deploy PROJECT_DIR=/path/to/project
@@ -125,7 +137,7 @@ The application data is stored in the `./data` directory, which is mounted as a 
 
 ## License
 
-This project is licensed under the MIT License. 
+This project is licensed under the MIT License.
 
 ## Contact
 

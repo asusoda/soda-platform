@@ -7,11 +7,7 @@ from datetime import datetime
 import requests
 
 # Import our modules
-from modules.marketing.events import get_upcoming_events
-from modules.marketing.template import get_discord_template, get_editor_html_css, get_view_html_css
-from modules.marketing.claude import generate_content, generate_grapes_code
-from modules.marketing.editable_link import get_server_url
-from modules.marketing.message import send_officer_notification
+from modules.marketing.template import get_editor_html_css, get_view_html_css
 from shared import logger, config
 from modules.marketing.selenium import post_to_social_media
 
@@ -49,7 +45,11 @@ marketing_config = {
     'oneup_pass': config.ONEUP_PASSWORD,
     'post_webhook_url': config.DISCORD_POST_WEBHOOK_URL,
     'check_interval': 3600,  # 1 hour by default
-    'monitoring_active': False
+    'monitoring_active': False,
+    'target_accounts': [
+        # 'soda.asu',  # Main SoDA Instagram account
+        'ashworks.dev'  # For testing purposes - remove in production
+    ]
 }
 
 # ==================================================================================================
@@ -119,7 +119,24 @@ def get_status():
         "api_url_configured": bool(marketing_config['api_url']),
         "officer_webhook_configured": bool(marketing_config['officer_webhook_url']),
         "post_webhook_configured": bool(marketing_config['post_webhook_url']),
-        "api_key_configured": bool(marketing_config['open_router_claude_api_key'])
+        "api_key_configured": bool(marketing_config['open_router_claude_api_key']),
+        "target_accounts": marketing_config['target_accounts']
+    })
+
+@marketing_blueprint.route('/update-target-accounts', methods=['POST'])
+def update_target_accounts():
+    """Update the target accounts for social media posting"""
+    data = request.json
+    new_accounts = data.get('accounts', [])
+    
+    if not isinstance(new_accounts, list):
+        return jsonify({"success": False, "message": "Accounts must be a list"})
+    
+    marketing_config['target_accounts'] = new_accounts
+    return jsonify({
+        "success": True, 
+        "message": "Target accounts updated successfully",
+        "target_accounts": marketing_config['target_accounts']
     })
 
 @marketing_blueprint.route('/toggle-monitoring', methods=['POST'])
@@ -273,6 +290,16 @@ def dashboard():
         </div>
         
         <div class="card">
+            <h2>Target Accounts for Social Media</h2>
+            <p>Current target accounts: <span id="target-accounts-display">Loading...</span></p>
+            <div style="margin-top: 10px;">
+                <input type="text" id="accounts-input" placeholder="Enter usernames separated by commas (e.g., soda.asu, ashworks.dev)" style="width: 70%; padding: 8px; margin-right: 10px;">
+                <button onclick="updateTargetAccounts()" style="padding: 8px 12px;">Update Accounts</button>
+            </div>
+            <p style="font-size: 12px; color: #666; margin-top: 5px;">These usernames will be used to select specific accounts in OneUp for posting</p>
+        </div>
+        
+        <div class="card">
             <h2>Events</h2>
             <div class="events-container">
                 {events_html}
@@ -288,6 +315,7 @@ def dashboard():
                         const statusIndicator = document.getElementById('status-indicator');
                         const statusText = document.getElementById('status-text');
                         const toggleBtn = document.getElementById('toggle-btn');
+                        const targetAccountsDisplay = document.getElementById('target-accounts-display');
                         
                         if (data.monitoring_active) {{
                             statusIndicator.className = 'status-indicator status-active';
@@ -300,7 +328,34 @@ def dashboard():
                             toggleBtn.textContent = 'Start Monitoring';
                             toggleBtn.className = '';
                         }}
+                        
+                        // Update target accounts display
+                        if (data.target_accounts) {{
+                            targetAccountsDisplay.textContent = data.target_accounts.join(', ');
+                            document.getElementById('accounts-input').value = data.target_accounts.join(', ');
+                        }}
                     }});
+            }}
+            
+            // Update target accounts
+            function updateTargetAccounts() {{
+                const input = document.getElementById('accounts-input');
+                const accounts = input.value.split(',').map(account => account.trim()).filter(account => account);
+                
+                fetch('/marketing/update-target-accounts', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ accounts: accounts }})
+                }})
+                .then(response => response.json())
+                .then(data => {{
+                    if (data.success) {{
+                        alert('Target accounts updated successfully!');
+                        updateStatus();
+                    }} else {{
+                        alert('Error: ' + data.message);
+                    }}
+                }});
             }}
             
             // Toggle monitoring
@@ -513,7 +568,7 @@ def post_event_to_socials(event_id):
             caption=caption,
             email=oneup_email,
             password=oneup_password,
-            platforms=["instagram", "linkedin"]
+            target_accounts=marketing_config['target_accounts']
         )
         
         if result["success"]:

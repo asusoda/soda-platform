@@ -75,7 +75,7 @@ def login_to_oneup(driver, email, password):
         logger.info(f"Login error: {str(e)}")
         return False
 
-def create_social_media_post(driver, image_data, caption, platforms=None):
+def create_social_media_post(driver, image_data, caption, target_accounts=None):
     """
     Create a new post on OneUp
     
@@ -83,13 +83,13 @@ def create_social_media_post(driver, image_data, caption, platforms=None):
         driver (WebDriver): Selenium WebDriver instance
         image_data (bytes): Image data to upload
         caption (str): Caption for the post
-        platforms (list): List of platforms to post to, defaults to ["instagram", "linkedin"]
+        target_accounts (list): List of account usernames to post to, defaults to ["soda.asu"]
         
     Returns:
         bool: True if post was created successfully, False otherwise
     """
-    if platforms is None:
-        platforms = ["instagram", "linkedin"]
+    if target_accounts is None:
+        target_accounts = ["soda.asu"]
     
     try:
         # Click "Create Post" button
@@ -101,16 +101,19 @@ def create_social_media_post(driver, image_data, caption, platforms=None):
             EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'post-editor')]"))
         )
         
-        # Select platforms
-        for platform in platforms:
+        # Select accounts by username
+        for username in target_accounts:
             try:
-                platform_checkbox = driver.find_element(
-                    By.XPATH, f"//label[contains(text(), '{platform.title()}')]"
+                # Look for the account by username in the account selection area
+                account_checkbox = driver.find_element(
+                    By.XPATH, f"//a[contains(@href, '{username}') or contains(text(), '{username}')]/ancestor::div[contains(@class, 'account')]//input[@type='checkbox']"
                 )
-                platform_checkbox.click()
-                time.sleep(0.5)  # Small delay between clicks
+                if not account_checkbox.is_selected():
+                    account_checkbox.click()
+                    time.sleep(0.5)  # Small delay between clicks
+                logger.info(f"Selected account: {username}")
             except NoSuchElementException:
-                logger.info(f"Platform {platform} not found")
+                logger.info(f"Account {username} not found or not available for posting")
         
         # Upload image
         # First, we need to save the image data to a temporary file
@@ -148,7 +151,7 @@ def create_social_media_post(driver, image_data, caption, platforms=None):
         logger.info(f"Error creating post: {str(e)}")
         return False
 
-def post_to_social_media(image_data, caption, email, password, platforms=None):
+def post_to_social_media(image_data, caption, email, password, target_accounts=None):
     """
     Main function to post to social media using OneUp
     
@@ -157,7 +160,7 @@ def post_to_social_media(image_data, caption, email, password, platforms=None):
         caption (str): Caption for the post
         email (str): OneUp account email
         password (str): OneUp account password
-        platforms (list): List of platforms to post to
+        target_accounts (list): List of account usernames to post to
         
     Returns:
         dict: Result status and message
@@ -175,7 +178,7 @@ def post_to_social_media(image_data, caption, email, password, platforms=None):
             }
         
         # Create the post
-        post_success = create_social_media_post(driver, image_data, caption, platforms)
+        post_success = create_social_media_post(driver, image_data, caption, target_accounts)
         if not post_success:
             return {
                 "success": False,
