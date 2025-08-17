@@ -130,11 +130,11 @@ wheels = [
 
 [[package]]
 name = "blinker"
-version = "1.7.0"
+version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a1/13/6df5fc090ff4e5d246baf1f45fe9e5623aa8565757dfa5bd243f6a545f9e/blinker-1.7.0.tar.gz", hash = "sha256:e6820ff6fa4e4d1d8e2747c2283749c3f547e4fee112b98555cdcdae32996182", size = 28134, upload-time = "2023-11-01T22:06:01.588Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/21/28/9b3f50ce0e048515135495f198351908d99540d69bfdc8c1d15b73dc55ce/blinker-1.9.0.tar.gz", hash = "sha256:b4ce2265a7abece45e7cc896e98dbebe6cead56bcf805a3d23136d145f5445bf", size = 22460, upload-time = "2024-11-08T17:25:47.436Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/2a/7f3714cbc6356a0efec525ce7a0613d581072ed6eb53eb7b9754f33db807/blinker-1.7.0-py3-none-any.whl", hash = "sha256:c3f865d4d54db7abc53758a01601cf343fe55b84c1de4e3fa910e420b438d5b9", size = 13068, upload-time = "2023-11-01T22:06:00.162Z" },
+    { url = "https://files.pythonhosted.org/packages/10/cb/f2ad4230dc2eb1a74edf38f1a38b9b52277f75bef262d8908e60d957e13c/blinker-1.9.0-py3-none-any.whl", hash = "sha256:ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc", size = 8458, upload-time = "2024-11-08T17:25:46.184Z" },
 ]
 
 [[package]]
@@ -1334,7 +1334,7 @@ requires-dist = [
     { name = "async-timeout", specifier = "==4.0.3" },
     { name = "attrs", specifier = "==23.1.0" },
     { name = "bidict", specifier = "==0.23.1" },
-    { name = "blinker", specifier = "==1.7.0" },
+    { name = "blinker", specifier = "==1.9.0" },
     { name = "cachetools", specifier = "==5.3.2" },
     { name = "certifi", specifier = "==2024.7.4" },
     { name = "charset-normalizer", specifier = "==3.3.2" },
