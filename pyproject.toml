@@ -24,7 +24,7 @@ dependencies = [
     "flask-socketio==5.3.6",
     "flask-sqlalchemy==3.1.1",
     "frozenlist==1.7.0",
-    "greenlet==3.0.3",
+    "greenlet==3.2.4",
     "h11==0.16.0",
     "idna==3.7",
     "importlib-metadata==6.8.0",
