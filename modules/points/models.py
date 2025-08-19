@@ -1,10 +1,8 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Boolean, UniqueConstraint
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from modules.utils.base import Base
 
-# Updated User model to support multiple organizations
 # Updated User model to support multiple organizations
 class User(Base):
     __tablename__ = "users"
@@ -21,11 +19,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    
-    # Relationships
     points = relationship("Points", back_populates="user")
-    orders = relationship("Order", back_populates="user")
-    memberships = relationship("UserOrganizationMembership", back_populates="user")
     orders = relationship("Order", back_populates="user")
     memberships = relationship("UserOrganizationMembership", back_populates="user")
 
@@ -69,3 +63,81 @@ class Points(Base):
 
     def __repr__(self):
         return f"<Points(id={self.id}, user_id={self.user_id}, organization_id={self.organization_id}, points={self.points}, event={self.event}, timestamp={self.timestamp})>"
+
+
+class PartnerMember(Base):
+    """Members from partner organizations who can earn and spend points"""
+    __tablename__ = "partner_members"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    discord_id = Column(String(50), nullable=True)  # Discord ID if linked
+    external_id = Column(String(100), nullable=True)  # ID from partner system
+    email = Column(String(255), nullable=False)
+    name = Column(String(100), nullable=False)
+    username = Column(String(100), nullable=True)
+    auth_provider = Column(String(50), nullable=False, default='discord')  # 'discord', 'oauth', 'email', etc.
+    
+    # Points tracking (following same pattern as existing models)
+    total_points_earned = Column(Float, default=0.0)  # Lifetime points earned
+    total_points_spent = Column(Float, default=0.0)   # Lifetime points spent
+    current_points = Column(Float, default=0.0)       # Current points balance
+    
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    organization = relationship("Organization", backref="partner_members")
+    points_transactions = relationship("PartnerPointsTransaction", back_populates="member")
+    
+    # Unique constraint to prevent duplicate members per org
+    __table_args__ = (
+        UniqueConstraint('organization_id', 'discord_id', name='unique_partner_discord_org'),
+        UniqueConstraint('organization_id', 'email', name='unique_partner_email_org'),
+    )
+    
+    def __repr__(self):
+        return f"<PartnerMember(id={self.id}, name='{self.name}', org_id={self.organization_id}, points={self.current_points})>"
+
+
+class PartnerPointsTransaction(Base):
+    """Points transactions for partner members (earning and spending)"""
+    __tablename__ = "partner_points_transactions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    partner_member_id = Column(Integer, ForeignKey("partner_members.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    points = Column(Float, nullable=False)  # Positive for earning, negative for spending
+    transaction_type = Column(String(50), nullable=False)  # 'earn', 'spend', 'adjustment'
+    description = Column(String(255), nullable=True)  # What the points were for
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)  # If related to purchase
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    member = relationship("PartnerMember", back_populates="points_transactions")
+    organization = relationship("Organization", backref="partner_points_transactions")
+    # Note: order relationship will be added when we update merch models
+    
+    def __repr__(self):
+        return f"<PartnerPointsTransaction(id={self.id}, member_id={self.partner_member_id}, org_id={self.organization_id}, points={self.points}, type='{self.transaction_type}')>"
+
+
+class PartnerSession(Base):
+    """Session for partner organization members to track points and purchases"""
+    __tablename__ = "partner_sessions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(64), nullable=False, unique=True, index=True)
+    partner_member_id = Column(Integer, ForeignKey("partner_members.id"), nullable=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    points_balance = Column(Float, default=0.0)  # Cached points balance
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    member = relationship("PartnerMember", backref="sessions")
+    organization = relationship("Organization", backref="partner_sessions")
+    
+    def __repr__(self):
+        return f"<PartnerSession(id={self.id}, session_id='{self.session_id}', member_id={self.partner_member_id}, org_id={self.organization_id})>"

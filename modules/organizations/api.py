@@ -227,4 +227,138 @@ def update_organization_ocp_sync(org_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        db.close() 
+        db.close()
+
+
+# OAuth Configuration endpoints
+@organizations_blueprint.route("/<int:org_id>/oauth", methods=["PUT"])
+@auth_required
+def update_organization_oauth_settings(org_id):
+    """Update organization OAuth callback URL and storefront settings"""
+    from shared import config
+    import re
+    
+    data = request.get_json()
+    
+    db = next(db_connect.get_db())
+    try:
+        organization = db.query(Organization).filter_by(
+            id=org_id, 
+            is_active=True
+        ).first()
+        
+        if not organization:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        # Update OAuth and storefront settings
+        if 'oauth_callback_url' in data:
+            callback_url = data['oauth_callback_url']
+            if callback_url and not validate_callback_url(callback_url):
+                return jsonify({"error": "Invalid callback URL"}), 400
+            organization.oauth_callback_url = callback_url
+        
+        if 'storefront_enabled' in data:
+            organization.storefront_enabled = bool(data['storefront_enabled'])
+        
+        if 'public_storefront' in data:
+            organization.public_storefront = bool(data['public_storefront'])
+        
+        if 'allowed_domains' in data:
+            organization.allowed_domains = data['allowed_domains']
+        
+        if 'points_spending_enabled' in data:
+            organization.points_spending_enabled = bool(data['points_spending_enabled'])
+        
+        if 'theme_config' in data:
+            organization.theme_config = data['theme_config']
+        
+        if 'logo_url' in data:
+            organization.logo_url = data['logo_url']
+        
+        db.commit()
+        
+        # Return the login URL if callback is configured
+        login_url = None
+        if organization.oauth_callback_url and organization.storefront_enabled:
+            login_url = f"{config.API_URL}/api/auth/partner/login/{organization.prefix}"
+        
+        return jsonify({
+            "message": "OAuth settings updated successfully",
+            "oauth_callback_url": organization.oauth_callback_url,
+            "storefront_enabled": organization.storefront_enabled,
+            "login_url": login_url,
+            "org_prefix": organization.prefix
+        }), 200
+        
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+@organizations_blueprint.route("/<int:org_id>/oauth", methods=["GET"])
+@auth_required
+def get_organization_oauth_settings(org_id):
+    """Get organization OAuth settings"""
+    from shared import config
+    
+    db = next(db_connect.get_db())
+    try:
+        organization = db.query(Organization).filter_by(
+            id=org_id, 
+            is_active=True
+        ).first()
+        
+        if not organization:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        login_url = None
+        if organization.oauth_callback_url and organization.storefront_enabled:
+            login_url = f"{config.API_URL}/api/auth/partner/login/{organization.prefix}"
+        
+        return jsonify({
+            "oauth_callback_url": organization.oauth_callback_url,
+            "storefront_enabled": organization.storefront_enabled,
+            "public_storefront": organization.public_storefront,
+            "allowed_domains": organization.allowed_domains,
+            "points_spending_enabled": organization.points_spending_enabled,
+            "points_enabled": organization.points_enabled,
+            "points_earning_rules": organization.points_earning_rules,
+            "theme_config": organization.theme_config,
+            "logo_url": organization.logo_url,
+            "login_url": login_url,
+            "org_prefix": organization.prefix
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        db.close()
+
+
+def validate_callback_url(url):
+    """Validate callback URL format and security"""
+    import re
+    
+    if not url:
+        return False
+    
+    # Basic URL validation
+    url_pattern = re.compile(
+        r'^https?://'  # http:// or https://
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+[A-Z]{2,6}\.?|'  # domain...
+        r'localhost|'  # localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...or ip
+        r'(?::\d+)?'  # optional port
+        r'(?:/?|[/?]\S+)$', re.IGNORECASE)
+    
+    if not url_pattern.match(url):
+        return False
+    
+    # Security checks
+    if url.startswith('http://') and 'localhost' not in url and '127.0.0.1' not in url:
+        # Only allow http for localhost/dev, require https for production
+        return False
+    
+    return True
