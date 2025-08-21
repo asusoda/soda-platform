@@ -119,7 +119,7 @@ class MarketingService:
             db.close()
     
     def log_activity(self, event_id: str, action: str, status: str, platform: str = None, 
-                    message: str = None, metadata: Dict = None) -> bool:
+                    message: str = None) -> bool:
         """Log marketing activity"""
         db = next(self.db_connect.get_db())
         try:
@@ -129,7 +129,6 @@ class MarketingService:
                 platform=platform,
                 status=status,
                 message=message,
-                metadata=metadata
             )
             db.add(log_entry)
             db.commit()

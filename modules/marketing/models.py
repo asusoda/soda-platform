@@ -86,7 +86,6 @@ class MarketingLog(Base):
     platform = Column(String(50), nullable=True)  # instagram, linkedin, discord, email
     status = Column(String(50), nullable=False)   # success, failed, pending
     message = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)        # Store additional data like error details, response data
     
     created_at = Column(DateTime, default=datetime.utcnow)
 
