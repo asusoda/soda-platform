@@ -22,8 +22,7 @@ help:
 	@echo "  make shell       - Open shell in API container"
 	@echo "  make clean       - Clean up containers and images"
 	@echo "  make deploy      - Deploy to production (pull, build, restart)"
-	@echo "  make dev         - Start development environment"
-	@echo "  make prod        - Start production environment locally"
+	@echo "  make dev         - Start development environment with hot reloading"
 	@echo "  make rollback    - Rollback to previous version"
 	@echo "  make status      - Show container status"
 	@echo "  make health      - Check container health"
@@ -51,7 +50,12 @@ up:
 # Stop services
 down:
 	@echo -e "$(GREEN)[INFO]$(NC) Stopping services..."
-	@$(COMPOSE_CMD) down
+	@if $(CONTAINER_CMD) ps --format "{{.Names}}" | grep -q "soda-.*-dev"; then \
+		echo -e "$(YELLOW)[INFO]$(NC) Development containers detected, stopping them..."; \
+		$(COMPOSE_CMD) -f docker-compose.dev.yml down; \
+	else \
+		$(COMPOSE_CMD) down; \
+	fi
 
 # View logs (batch-friendly, last 50 lines)
 logs:
@@ -115,13 +119,9 @@ deploy:
 
 # Development environment
 dev:
-	@echo -e "$(GREEN)[INFO]$(NC) Starting development environment..."
-	@$(COMPOSE_CMD) up
+	@echo -e "$(GREEN)[INFO]$(NC) Starting development environment with hot reloading..."
+	@$(COMPOSE_CMD) -f docker-compose.yml -f docker-compose.dev.yml up
 
-# Production environment (locally)
-prod:
-	@echo -e "$(GREEN)[INFO]$(NC) Starting production environment..."
-	@$(COMPOSE_CMD) up -d
 
 # Rollback to previous version
 rollback:

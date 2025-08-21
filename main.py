@@ -26,15 +26,8 @@ import os
 
 from datetime import datetime
 
-# Enable Flask's debug mode and template auto-reload for development
-app.config['DEBUG'] = True
-app.config['TEMPLATES_AUTO_RELOAD'] = True
-
 # Set a secret key for session management
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'dev-secret-key')
-
-# Configure Jinja2 to output template path during rendering (helps debug template issues)
-app.config['EXPLAIN_TEMPLATE_LOADING'] = True
 
 # Initialize multi-organization calendar service
 multi_org_calendar_service = MultiOrgCalendarService(logger)
@@ -165,10 +158,11 @@ def initialize_app():
     scheduler.add_job(unified_sync_job, 'interval', minutes=60, id='unified_notion_sync_job')
     scheduler.start()
     logger.info("APScheduler started for Notion-Google Calendar sync.")
-    
+
     # Start Flask app
-    # Use debug=True in development to help with template errors
-    app.run(host='0.0.0.0', port=8000, debug=True, use_reloader=False)
+    # Enable debug and reloader based on IS_PROD environment variable
+    is_prod = os.environ.get('IS_PROD', '').lower() == 'true'
+    app.run(host='0.0.0.0', port=8000, debug=not is_prod, use_reloader=not is_prod)
 
 if __name__ == "__main__":
     initialize_app()
