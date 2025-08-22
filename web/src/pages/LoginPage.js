@@ -10,7 +10,7 @@ const LoginPage = () => {
 
   // Function to handle login
   const handleLogin = () => {
-    window.location.href = "httpa://api.thesoda.io/api/auth/login"; // Redirect to your Flask backend login route
+    window.location.href = "https://api.thesoda.io/api/auth/login"; // Redirect to your Flask backend login route
   };
 
   // Function to handle bot invitation
