@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import ThemedLoading from '../components/ui/ThemedLoading';
 import Orb from '../components/ui/Orb';
 import OrganizationCard from '../components/ui/OrganizationCard';
+import OAuthManager from '../components/superadmin/OAuthManager';
+import OAuthSummary from '../components/superadmin/OAuthSummary';
 import { toast } from 'react-toastify';
 
 const SuperAdmin = () => {
@@ -27,6 +29,9 @@ const SuperAdmin = () => {
   const [updatingCalendar, setUpdatingCalendar] = useState(false);
   const [ocpSyncEnabled, setOcpSyncEnabled] = useState(false);
   const [updatingOcpSync, setUpdatingOcpSync] = useState(false);
+  const [showOAuthManager, setShowOAuthManager] = useState(false);
+  const [selectedOrgForOAuth, setSelectedOrgForOAuth] = useState(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -91,6 +96,26 @@ const SuperAdmin = () => {
     });
     setOcpSyncEnabled(org.ocp_sync_enabled || false);
     setShowCalendarModal(true);
+  };
+
+  const openOAuthConfig = async (org) => {
+    setSelectedOrgForOAuth(org);
+    setShowOAuthManager(true);
+  };
+
+  const handleOAuthUpdate = (updatedOrg) => {
+    // Update the organization in the dashboard data
+    if (dashboardData && dashboardData.existing_orgs) {
+      const updatedOrgs = dashboardData.existing_orgs.map(org => 
+        org.id === updatedOrg.id ? updatedOrg : org
+      );
+      setDashboardData(prev => ({
+        ...prev,
+        existing_orgs: updatedOrgs
+      }));
+    }
+    setShowOAuthManager(false);
+    setSelectedOrgForOAuth(null);
   };
 
   const updateOfficerRole = async () => {
@@ -310,31 +335,62 @@ const SuperAdmin = () => {
           </button>
         </div>
 
-        {/* Officer's Organizations Section */}
-        {dashboardData?.officer_orgs?.length > 0 && (
-          <div className="mb-12">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-white">Your Organizations</h2>
-              <div className="text-sm text-gray-400">
-                {dashboardData.officer_orgs.length} organization{dashboardData.officer_orgs.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {dashboardData.officer_orgs.map((org) => (
-                <OrganizationCard
-                  key={org.id}
-                  org={org}
-                  variant="officer"
-                  onViewDashboard={handleViewOrganization}
-                  onConfigure={openRoleConfig}
-                  onCalendarConfig={openCalendarConfig}
-                  onPrefixUpdate={(newPrefix) => updateOrganizationPrefix(org.id, newPrefix)}
-                  validatePrefix={validatePrefix}
-                />
-              ))}
-            </div>
+        {/* Tab Navigation */}
+        <div className="mb-8">
+          <div className="border-b border-gray-700">
+            <nav className="flex space-x-8">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'dashboard'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
+                }`}
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => setActiveTab('oauth')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'oauth'
+                    ? 'border-blue-500 text-blue-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
+                }`}
+              >
+                OAuth Management
+              </button>
+            </nav>
           </div>
-        )}
+        </div>
+
+        {/* Dashboard Tab Content */}
+        {activeTab === 'dashboard' && (
+          <>
+            {/* Officer's Organizations Section */}
+            {dashboardData?.officer_orgs?.length > 0 && (
+              <div className="mb-12">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-white">Your Organizations</h2>
+                  <div className="text-sm text-gray-400">
+                    {dashboardData.officer_orgs.length} organization{dashboardData.officer_orgs.length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {dashboardData.officer_orgs.map((org) => (
+                    <OrganizationCard
+                      key={org.id}
+                      org={org}
+                      variant="officer"
+                      onViewDashboard={handleViewOrganization}
+                      onConfigure={openRoleConfig}
+                      onCalendarConfig={openCalendarConfig}
+                      onPrefixUpdate={(newPrefix) => updateOrganizationPrefix(org.id, newPrefix)}
+                      validatePrefix={validatePrefix}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
         {/* Feature Cards Section */}
         <div className="mb-12">
@@ -459,7 +515,7 @@ const SuperAdmin = () => {
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-white">Existing Organizations</h2>
             <div className="text-sm text-gray-400">
-              {dashboardData?.existing_orgs?.length || 0} organization{dashboardData?.existing_orgs?.length !== 1 ? 's' : ''} managed
+              {dashboardData?.existing_orgs?.length || 0} organization{dashboardData?.existing_orgs.length !== 1 ? 's' : ''} managed
             </div>
           </div>
           {dashboardData?.existing_orgs?.length > 0 ? (
@@ -491,7 +547,93 @@ const SuperAdmin = () => {
             </div>
           )}
         </div>
+          </>
+        )}
+
+        {/* OAuth Management Tab Content */}
+        {activeTab === 'oauth' && (
+          <>
+            <OAuthSummary getApiClient={getApiClient} />
+            
+            {dashboardData?.existing_orgs?.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-6">Organization OAuth Settings</h2>
+                <div className="space-y-6">
+                  {dashboardData.existing_orgs.map((org) => (
+                    <div key={org.id} className="bg-gray-800/50 backdrop-blur-sm rounded-xl border border-gray-700/50 p-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">{org.name}</h3>
+                          <p className="text-gray-400 text-sm">Prefix: {org.prefix}</p>
+                        </div>
+                        <button
+                          onClick={() => openOAuthConfig(org)}
+                          className="px-4 py-2 bg-blue-600/50 hover:bg-blue-700/50 backdrop-blur-sm rounded-md text-sm font-medium transition-colors border border-blue-500/50"
+                        >
+                          Configure OAuth
+                        </button>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div className="text-center">
+                          <div className={`text-lg ${org.oauth_enabled ? 'text-green-400' : 'text-red-400'}`}>
+                            {org.oauth_enabled ? '✓' : '✗'}
+                          </div>
+                          <div className="text-gray-400">OAuth Enabled</div>
+                        </div>
+                        <div className="text-center">
+                          <div className={`text-lg ${org.oauth_callback_url ? 'text-green-400' : 'text-red-400'}`}>
+                            {org.oauth_callback_url ? '✓' : '✗'}
+                          </div>
+                          <div className="text-gray-400">Callback URL</div>
+                        </div>
+                        <div className="text-center">
+                          <div className={`text-lg ${org.allowed_domains && org.allowed_domains.length > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {org.allowed_domains && org.allowed_domains.length > 0 ? '✓' : '✗'}
+                          </div>
+                          <div className="text-gray-400">Domains</div>
+                        </div>
+                        <div className="text-center">
+                          <div className={`text-lg ${org.storefront_enabled ? 'text-green-400' : 'text-red-400'}`}>
+                            {org.storefront_enabled ? '✓' : '✗'}
+                          </div>
+                          <div className="text-gray-400">Storefront</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
+
+      {/* OAuth Configuration Modal */}
+      {showOAuthManager && selectedOrgForOAuth && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-gray-800/90 backdrop-blur-sm rounded-xl border border-gray-600/50 p-6 max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">OAuth Configuration</h2>
+              <button
+                onClick={() => {
+                  setShowOAuthManager(false);
+                  setSelectedOrgForOAuth(null);
+                }}
+                className="text-gray-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <OAuthManager
+              organization={selectedOrgForOAuth}
+              onUpdate={handleOAuthUpdate}
+              getApiClient={getApiClient}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Role Configuration Modal */}
       {showRoleModal && configuringOrg && (

@@ -1,120 +1,112 @@
 # Authentication Module
 
-The authentication module handles all aspects of user authentication and authorization in the SoDA Internal API.
-
-## Structure
-
-```
-auth/
-├── api.py           # Authentication endpoints
-└── decorators.py    # Authentication decorators
-```
+This module handles Discord OAuth authentication for both SoDA members and partner organizations.
 
 ## Features
 
-### Authentication
-- JWT-based authentication
-- Session management
-- Token refresh mechanism
-- OAuth2 integration
-- Role-based access control
+### SoDA Member Authentication
+- Standard Discord OAuth flow for SoDA officers
+- Access and refresh token management
+- Session management with officer guild information
 
-### Security
-- Secure token storage
-- Token expiration
-- CSRF protection
-- Rate limiting
-- Secure password handling
+### Partner Organization OAuth
+- Domain-restricted OAuth for partner organizations
+- Callback URL management
+- Secure state parameter handling
+- Partner member creation and management
+
+## OAuth Flow for Partner Organizations
+
+### 1. Domain Authorization
+Partner organizations must have:
+- `oauth_enabled = true`
+- Valid `oauth_callback_url`
+- `allowed_domains` list containing authorized domains
+
+### 2. Authentication Process
+1. User visits partner site and clicks login
+2. Partner site redirects to `/auth/partner/login/<org_prefix>`
+3. System validates origin domain against `allowed_domains`
+4. If authorized, redirects to Discord OAuth with encoded state
+5. After Discord authentication, user is redirected to partner's callback URL
+
+### 3. State Parameter Security
+The OAuth state parameter contains:
+- Organization ID
+- Origin domain
+- Timestamp (for expiration)
+- Base64 encoded for URL safety
 
 ## API Endpoints
 
-### Authentication
-- `POST /auth/login`
-  - Authenticates a user
-  - Returns JWT tokens
-  - Sets session cookies
+### Partner OAuth
+- `GET /auth/partner/login/<org_prefix>` - Initiate partner OAuth
+- `GET /auth/callback` - Handle OAuth callback (shared with SoDA auth)
 
-- `POST /auth/logout`
-  - Invalidates current session
-  - Clears session cookies
-  - Revokes tokens
+### SoDA Authentication
+- `GET /auth/login` - Initiate SoDA OAuth
+- `POST /auth/refresh` - Refresh access token
+- `POST /auth/revoke` - Revoke refresh token
+- `GET /auth/validateToken` - Validate token
+- `GET /auth/name` - Get user name from token
+- `POST /auth/logout` - Logout user
 
-- `POST /auth/refresh`
-  - Refreshes expired tokens
-  - Returns new access token
-  - Maintains session
+## URL Utilities
 
-- `GET /auth/verify`
-  - Validates current token
-  - Returns user information
-  - Checks permissions
+The `url_utils.py` module provides:
 
-## Decorators
+- Domain extraction and validation
+- Callback URL building with parameters
+- OAuth state parameter management
+- Origin domain detection from requests
 
-### @requires_auth
-- Validates JWT token
-- Checks token expiration
-- Verifies user permissions
+## Security Features
 
-### @requires_role(role)
-- Checks user role
-- Validates permissions
-- Handles role hierarchy
+- Domain whitelisting for partner organizations
+- OAuth state parameter validation
+- Token expiration and refresh
+- Secure callback URL handling
+- CSRF protection via state parameter
 
 ## Configuration
 
-Required environment variables:
-- `JWT_SECRET_KEY`: Secret key for JWT tokens
-- `JWT_ACCESS_TOKEN_EXPIRES`: Access token expiration time
-- `JWT_REFRESH_TOKEN_EXPIRES`: Refresh token expiration time
-- `OAUTH_CLIENT_ID`: OAuth client ID
-- `OAUTH_CLIENT_SECRET`: OAuth client secret
+Partner organizations must be configured with:
+- `oauth_enabled: true`
+- `oauth_callback_url: "https://partner.com/auth/callback"`
+- `allowed_domains: ["partner.com", "app.partner.com"]`
 
-## Usage Example
+## Example Usage
 
-```python
-from modules.auth.decorators import requires_auth, requires_role
+### Partner Site Integration
+```javascript
+// Redirect user to SoDA OAuth
+const loginUrl = `https://api.soda.com/auth/partner/login/myorg`;
+window.location.href = loginUrl;
+```
 
-@requires_auth
-def protected_route():
-    # Route logic here
-    pass
+### Callback Handling
+```javascript
+// Partner site receives callback with session token
+const urlParams = new URLSearchParams(window.location.search);
+const sessionToken = urlParams.get('session_token');
+const memberId = urlParams.get('member_id');
+const pointsBalance = urlParams.get('points_balance');
 
-@requires_role('admin')
-def admin_route():
-    # Admin-only logic here
-    pass
+// Use session token for authenticated requests
 ```
 
 ## Error Handling
 
-The module handles various authentication errors:
-- Invalid tokens
-- Expired tokens
-- Missing permissions
-- Invalid credentials
-- Rate limit exceeded
+Common error responses:
+- `400` - Missing or invalid parameters
+- `403` - Domain not authorized
+- `404` - Organization not found or OAuth not enabled
+- `500` - Internal server error
 
-## Security Considerations
+## Logging
 
-1. **Token Security**
-   - Tokens are signed with a secure key
-   - Access tokens have short expiration
-   - Refresh tokens are stored securely
-
-2. **Password Security**
-   - Passwords are hashed using bcrypt
-   - Salt is generated for each password
-   - Password strength requirements
-
-3. **Session Security**
-   - Sessions are tied to IP addresses
-   - Session timeouts are enforced
-   - Concurrent sessions are limited
-
-## Dependencies
-
-- `PyJWT`: JWT token handling
-- `bcrypt`: Password hashing
-- `Flask-JWT-Extended`: JWT integration
-- `oauthlib`: OAuth2 implementation 
+All authentication events are logged with:
+- User/organization identification
+- Domain validation results
+- OAuth flow status
+- Error details for debugging 

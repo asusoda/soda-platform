@@ -3,6 +3,7 @@ from shared import db_connect, config, tokenManger
 from modules.organizations.models import Organization
 from modules.organizations.config import OrganizationSettings
 from modules.auth.decoraters import superadmin_required
+from modules.auth.url_utils import validate_callback_url, sanitize_domain_list
 
 superadmin_blueprint = Blueprint("superadmin", __name__)
 
@@ -126,10 +127,25 @@ def get_dashboard():
         
         print(f"🔍 [DEBUG] User is officer in {len(officer_orgs)} organizations")
         
+        # Get OAuth status for all organizations
+        oauth_status = []
+        for org in existing_orgs:
+            oauth_info = {
+                "id": org.id,
+                "name": org.name,
+                "prefix": org.prefix,
+                "oauth_enabled": org.oauth_enabled,
+                "has_callback_url": bool(org.oauth_callback_url),
+                "allowed_domains_count": len(org.allowed_domains) if org.allowed_domains else 0,
+                "storefront_enabled": org.storefront_enabled
+            }
+            oauth_status.append(oauth_info)
+        
         response_data = {
             "available_guilds": available_guilds,
             "existing_orgs": [org.to_dict() for org in existing_orgs],
-            "officer_orgs": [org.to_dict() for org in officer_orgs]
+            "officer_orgs": [org.to_dict() for org in officer_orgs],
+            "oauth_status": oauth_status
         }
         
         print(f"✅ [DEBUG] Dashboard data prepared successfully")
@@ -360,3 +376,270 @@ def remove_organization(org_id):
         return jsonify({"error": str(e)}), 500
     finally:
         db.close() 
+
+
+@superadmin_blueprint.route("/organizations/<int:org_id>/oauth", methods=["PUT"])
+@superadmin_required
+def update_organization_oauth(org_id):
+    """Update OAuth settings for an organization"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Request data required"}), 400
+        
+        # Validate required fields
+        required_fields = ['oauth_enabled', 'oauth_callback_url']
+        if not all(field in data for field in required_fields):
+            return jsonify({"error": f"Missing required fields: {required_fields}"}), 400
+        
+        # Validate callback URL if provided
+        if data['oauth_callback_url']:
+            is_valid, error_msg = validate_callback_url(data['oauth_callback_url'])
+            if not is_valid:
+                return jsonify({"error": f"Invalid callback URL: {error_msg}"}), 400
+        
+        # Validate and sanitize allowed domains
+        allowed_domains = []
+        if 'allowed_domains' in data and isinstance(data['allowed_domains'], list):
+            allowed_domains = sanitize_domain_list(data['allowed_domains'])
+        
+        # Get organization from database
+        db = next(db_connect.get_db())
+        org = db.query(Organization).filter_by(id=org_id).first()
+        
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        # Update OAuth settings
+        org.oauth_enabled = data['oauth_enabled']
+        org.oauth_callback_url = data['oauth_callback_url']
+        org.allowed_domains = allowed_domains
+        
+        # Generate OAuth state secret if enabling OAuth
+        if data['oauth_enabled'] and not org.oauth_state_secret:
+            import secrets
+            org.oauth_state_secret = secrets.token_urlsafe(32)
+        
+        db.commit()
+        
+        return jsonify({
+            "message": f"OAuth settings updated successfully for {org.name}",
+            "organization": org.to_dict()
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'db' in locals():
+            db.close()
+
+
+@superadmin_blueprint.route("/organizations/<int:org_id>/oauth", methods=["GET"])
+@superadmin_required
+def get_organization_oauth(org_id):
+    """Get OAuth settings for an organization"""
+    try:
+        db = next(db_connect.get_db())
+        org = db.query(Organization).filter_by(id=org_id).first()
+        
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        oauth_settings = {
+            "oauth_enabled": org.oauth_enabled,
+            "oauth_callback_url": org.oauth_callback_url,
+            "allowed_domains": org.allowed_domains,
+            "oauth_state_secret": org.oauth_state_secret
+        }
+        
+        return jsonify(oauth_settings)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'db' in locals():
+            db.close()
+
+
+@superadmin_blueprint.route("/organizations/<int:org_id>/domains", methods=["PUT"])
+@superadmin_required
+def update_organization_domains(org_id):
+    """Update allowed domains for an organization"""
+    try:
+        data = request.get_json()
+        if not data or 'allowed_domains' not in data:
+            return jsonify({"error": "allowed_domains field required"}), 400
+        
+        if not isinstance(data['allowed_domains'], list):
+            return jsonify({"error": "allowed_domains must be a list"}), 400
+        
+        # Validate and sanitize domains
+        allowed_domains = sanitize_domain_list(data['allowed_domains'])
+        
+        # Get organization from database
+        db = next(db_connect.get_db())
+        org = db.query(Organization).filter_by(id=org_id).first()
+        
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        # Update allowed domains
+        org.allowed_domains = allowed_domains
+        db.commit()
+        
+        return jsonify({
+            "message": f"Allowed domains updated successfully for {org.name}",
+            "allowed_domains": allowed_domains
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'db' in locals():
+            db.close()
+
+
+@superadmin_blueprint.route("/organizations/<int:org_id>/callback", methods=["PUT"])
+@superadmin_required
+def update_organization_callback(org_id):
+    """Update OAuth callback URL for an organization"""
+    try:
+        data = request.get_json()
+        if not data or 'oauth_callback_url' not in data:
+            return jsonify({"error": "oauth_callback_url field required"}), 400
+        
+        callback_url = data['oauth_callback_url']
+        
+        # Validate callback URL
+        is_valid, error_msg = validate_callback_url(callback_url)
+        if not is_valid:
+            return jsonify({"error": f"Invalid callback URL: {error_msg}"}), 400
+        
+        # Get organization from database
+        db = next(db_connect.get_db())
+        org = db.query(Organization).filter_by(id=org_id).first()
+        
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        # Update callback URL
+        org.oauth_callback_url = callback_url
+        db.commit()
+        
+        return jsonify({
+            "message": f"Callback URL updated successfully for {org.name}",
+            "oauth_callback_url": callback_url
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'db' in locals():
+            db.close()
+
+
+@superadmin_blueprint.route("/organizations/<int:org_id>/oauth/test", methods=["POST"])
+@superadmin_required
+def test_organization_oauth(org_id):
+    """Test OAuth configuration for an organization"""
+    try:
+        db = next(db_connect.get_db())
+        org = db.query(Organization).filter_by(id=org_id).first()
+        
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+        
+        # Check OAuth configuration
+        oauth_config = {
+            "oauth_enabled": org.oauth_enabled,
+            "has_callback_url": bool(org.oauth_callback_url),
+            "has_allowed_domains": bool(org.allowed_domains),
+            "domains_count": len(org.allowed_domains) if org.allowed_domains else 0,
+            "has_state_secret": bool(org.oauth_state_secret)
+        }
+        
+        # Validate callback URL if present
+        if org.oauth_callback_url:
+            is_valid, error_msg = validate_callback_url(org.oauth_callback_url)
+            oauth_config["callback_url_valid"] = is_valid
+            if not is_valid:
+                oauth_config["callback_url_error"] = error_msg
+        
+        # Validate domains if present
+        if org.allowed_domains:
+            from modules.auth.url_utils import is_valid_domain
+            valid_domains = []
+            invalid_domains = []
+            
+            for domain in org.allowed_domains:
+                if is_valid_domain(domain):
+                    valid_domains.append(domain)
+                else:
+                    invalid_domains.append(domain)
+            
+            oauth_config["valid_domains"] = valid_domains
+            oauth_config["invalid_domains"] = invalid_domains
+            oauth_config["all_domains_valid"] = len(invalid_domains) == 0
+        
+        return jsonify({
+            "organization": org.name,
+            "oauth_config": oauth_config
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'db' in locals():
+            db.close()
+
+
+@superadmin_blueprint.route("/organizations/oauth/summary", methods=["GET"])
+@superadmin_required
+def get_oauth_summary():
+    """Get summary of OAuth configurations across all organizations"""
+    try:
+        db = next(db_connect.get_db())
+        organizations = db.query(Organization).all()
+        
+        oauth_summary = {
+            "total_organizations": len(organizations),
+            "oauth_enabled_count": 0,
+            "oauth_configured_count": 0,
+            "organizations_with_domains": 0,
+            "organizations_with_callbacks": 0,
+            "organizations_details": []
+        }
+        
+        for org in organizations:
+            org_oauth_info = {
+                "id": org.id,
+                "name": org.name,
+                "prefix": org.prefix,
+                "oauth_enabled": org.oauth_enabled,
+                "oauth_callback_url": org.oauth_callback_url,
+                "allowed_domains": org.allowed_domains,
+                "storefront_enabled": org.storefront_enabled,
+                "is_active": org.is_active
+            }
+            
+            oauth_summary["organizations_details"].append(org_oauth_info)
+            
+            if org.oauth_enabled:
+                oauth_summary["oauth_enabled_count"] += 1
+            
+            if org.oauth_enabled and org.oauth_callback_url and org.allowed_domains:
+                oauth_summary["oauth_configured_count"] += 1
+            
+            if org.allowed_domains:
+                oauth_summary["organizations_with_domains"] += 1
+            
+            if org.oauth_callback_url:
+                oauth_summary["organizations_with_callbacks"] += 1
+        
+        return jsonify(oauth_summary)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if 'db' in locals():
+            db.close()

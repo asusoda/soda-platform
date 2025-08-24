@@ -33,8 +33,10 @@ class Organization(Base):
     storefront_enabled = Column(Boolean, default=False)  # Enable partner storefront
     public_storefront = Column(Boolean, default=False)  # Allow non-Discord members
     oauth_callback_url = Column(String(500), nullable=True)  # OAuth callback URL for partner sites
-    allowed_domains = Column(JSON, default=list)  # CORS domains for embeds
+    allowed_domains = Column(JSON, default=list)  # CORS domains for embeds and OAuth
     custom_domain = Column(String(255), nullable=True)  # Custom storefront domain
+    oauth_enabled = Column(Boolean, default=False)  # Enable OAuth for this organization
+    oauth_state_secret = Column(String(255), nullable=True)  # Secret for OAuth state validation
     
     # Points Configuration for Partners
     points_enabled = Column(Boolean, default=True)  # Enable points system
@@ -74,6 +76,8 @@ class Organization(Base):
             "oauth_callback_url": self.oauth_callback_url,
             "allowed_domains": self.allowed_domains,
             "custom_domain": self.custom_domain,
+            "oauth_enabled": self.oauth_enabled,
+            "oauth_state_secret": self.oauth_state_secret,
             # Points Configuration
             "points_enabled": self.points_enabled,
             "points_earning_rules": self.points_earning_rules,

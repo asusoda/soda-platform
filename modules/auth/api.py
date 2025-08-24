@@ -1,6 +1,13 @@
 from flask import request, jsonify, Blueprint, redirect, current_app, session, make_response
 from shared import config, tokenManger
 from modules.auth.decoraters import auth_required, error_handler
+from modules.auth.url_utils import (
+    extract_origin_from_request, 
+    is_domain_authorized, 
+    build_oauth_state, 
+    parse_oauth_state,
+    build_callback_url_with_params
+)
 import requests
 from modules.utils.logging_config import logger, get_logger
 from datetime import datetime
@@ -53,9 +60,15 @@ def callback():
     
     # Validate state parameter for partner flows
     if partner_org_prefix and state:
-        stored_state = session.get('oauth_state')
-        if not stored_state or stored_state != state:
+        # Parse the OAuth state to get organization and domain information
+        state_data = parse_oauth_state(state)
+        if not state_data:
             logger.warning(f"Invalid OAuth state for partner flow: {partner_org_prefix}")
+            return jsonify({"error": "Invalid OAuth state"}), 400
+        
+        # Verify the state matches the session data
+        if state_data.get('org_id') != partner_org_id:
+            logger.warning(f"OAuth state org_id mismatch for partner flow: {partner_org_prefix}")
             return jsonify({"error": "Invalid OAuth state"}), 400
     
     logger.info("Received authorization code, exchanging for token.")
@@ -263,6 +276,12 @@ def partner_login(org_prefix):
     """Initiate Discord OAuth for partner organization"""
     from shared import db_connect
     
+    # Extract origin domain from request
+    origin_domain = extract_origin_from_request(request)
+    if not origin_domain:
+        logger.warning("Partner login attempted without origin domain")
+        return jsonify({"error": "Origin domain could not be determined"}), 400
+    
     # Validate organization prefix and get org info
     db = next(db_connect.get_db())
     try:
@@ -270,29 +289,36 @@ def partner_login(org_prefix):
         organization = db.query(Organization).filter_by(
             prefix=org_prefix,
             is_active=True,
-            storefront_enabled=True
+            storefront_enabled=True,
+            oauth_enabled=True
         ).first()
         
         if not organization:
             logger.warning(f"Partner login attempted for invalid org prefix: {org_prefix}")
-            return jsonify({"error": "Organization not found or storefront not enabled"}), 404
+            return jsonify({"error": "Organization not found, storefront not enabled, or OAuth not enabled"}), 404
         
         if not organization.oauth_callback_url:
             logger.warning(f"Partner login attempted for org without callback URL: {org_prefix}")
             return jsonify({"error": "OAuth callback URL not configured for this organization"}), 400
         
-        logger.info(f"Starting partner OAuth flow for organization: {org_prefix}")
+        # Check if origin domain is authorized
+        if not organization.allowed_domains or not is_domain_authorized(origin_domain, organization.allowed_domains):
+            logger.warning(f"Unauthorized domain {origin_domain} attempted login for org {org_prefix}")
+            return jsonify({"error": "Domain not authorized for this organization"}), 403
+        
+        logger.info(f"Starting partner OAuth flow for organization: {org_prefix} from domain: {origin_domain}")
+        
+        # Build OAuth state with organization and domain information
+        oauth_state = build_oauth_state(
+            organization_id=organization.id,
+            origin_domain=origin_domain
+        )
         
         # Store partner context in session for callback
-        # This is how the system knows where to redirect after Discord OAuth
         session['partner_org_prefix'] = org_prefix
         session['partner_org_id'] = organization.id
         session['partner_callback_url'] = organization.oauth_callback_url
-        
-        # Generate state parameter for CSRF protection
-        import secrets
-        state = secrets.token_urlsafe(32)
-        session['oauth_state'] = state
+        session['origin_domain'] = origin_domain
         
         # Redirect to Discord OAuth with state parameter
         discord_auth_url = (
@@ -301,7 +327,7 @@ def partner_login(org_prefix):
             f"redirect_uri={REDIRECT_URI}&"
             f"response_type=code&"
             f"scope=identify%20guilds&"
-            f"state={state}"
+            f"state={oauth_state}"
         )
         
         logger.info(f"Redirecting to Discord OAuth for partner org {org_prefix}")
@@ -352,7 +378,7 @@ def handle_partner_callback(discord_id, username, org_prefix, org_id, callback_u
         
         # Redirect to partner callback URL with session token
         # Using the callback_url stored in session when user started OAuth flow
-        final_callback_url = build_callback_url(
+        final_callback_url = build_callback_url_with_params(
             base_url=callback_url,
             params={
                 'session_token': session_token,
@@ -374,7 +400,7 @@ def handle_partner_callback(discord_id, username, org_prefix, org_id, callback_u
         
     except Exception as e:
         logger.error(f"Partner callback error for {org_prefix}: {e}")
-        error_url = build_callback_url(
+        error_url = build_callback_url_with_params(
             base_url=callback_url,
             params={'error': 'authentication_failed', 'success': 'false'}
         )
@@ -471,21 +497,13 @@ def generate_partner_session_token(partner_member, organization_id):
         db.close()
 
 
-def build_callback_url(base_url, params):
-    """Build callback URL with parameters"""
-    if not base_url:
-        return f"{config.CLIENT_URL}/auth/?error=No callback URL configured"
-    
-    # Add query parameters to callback URL
-    separator = '&' if '?' in base_url else '?'
-    query_string = '&'.join([f"{k}={v}" for k, v in params.items()])
-    return f"{base_url}{separator}{query_string}"
+
 
 
 def redirect_to_error(callback_url, error_message):
     """Redirect to callback URL with error message"""
     if callback_url:
-        error_url = build_callback_url(callback_url, {'error': error_message, 'success': 'false'})
+        error_url = build_callback_url_with_params(callback_url, {'error': error_message, 'success': 'false'})
         return redirect(error_url)
     else:
         return jsonify({"error": error_message}), 400
