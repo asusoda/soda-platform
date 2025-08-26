@@ -140,7 +140,6 @@ def run_auth_bot_in_thread():
         logger.info("Auth bot thread finished and loop closed.")
 
 
-
 # --- App Initialization ---
 def initialize_app():
 
