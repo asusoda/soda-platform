@@ -3,7 +3,7 @@ import { useAuth } from "../auth/AuthContext";
 
 // Get API base URL from environment or default to localhost for development
 const getApiBaseUrl = () => {
-  return process.env.REACT_APP_API_URL || "http://localhost:8000";
+  return process.env.REACT_APP_API_URL || "https://api.thesoda.io";
 };
 
 const apiClient = axios.create({
