@@ -82,6 +82,8 @@ class MultiOrgCalendarService:
             finally:
                 if transaction:
                     transaction.finish()
+                if db:
+                    db.close()
     
     def sync_organization_notion_to_google(self, organization_id: int, parent_transaction=None) -> Dict[str, Any]:
         """Sync Notion events to Google Calendar for a specific organization."""
@@ -135,6 +137,8 @@ class MultiOrgCalendarService:
             finally:
                 if transaction:
                     transaction.finish()
+                if db:
+                    db.close()
     
     def update_organization_google_calendar(self, parsed_events: List[CalendarEventDTO], calendar_id: str, notion_database_id: str, parent_transaction=None) -> List[Dict]:
         """Update Google Calendar for a specific organization."""
